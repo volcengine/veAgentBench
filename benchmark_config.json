@@ -1,0 +1,89 @@
+{
+  "name": "ADK Agent Benchmark",
+  "version": "1.0.0",
+  "description": "Comprehensive benchmark for evaluating Agent Development Kit agents",
+  "dimensions": [
+    {
+      "name": "Tool Calling",
+      "metrics": [
+        {
+          "name": "Tool Call Success Rate (Pass@1)",
+          "id": "tool_pass_at_1",
+          "priority": "P0",
+          "description": "Single call success rate with correct tool selection, parameters, and execution",
+          "calculation": "successful_calls / total_calls"
+        },
+        {
+          "name": "Tool Call Trajectory Exact Match",
+          "id": "tool_exact_match",
+          "priority": "P1",
+          "description": "Exact match of tool call sequence, count, and parameters",
+          "calculation": "exact_matches / total_calls"
+        }
+      ]
+    },
+    {
+      "name": "Memory",
+      "metrics": [
+        {
+          "name": "Single-hop Task Accuracy",
+          "id": "memory_single_hop",
+          "priority": "P2",
+          "description": "Accuracy for tasks requiring information extraction from single dialogue turn",
+          "calculation": "correct_single_hop / total_single_hop"
+        }
+      ]
+    },
+    {
+      "name": "RAG",
+      "metrics": [
+        {
+          "name": "Answer Correctness",
+          "id": "rag_correctness",
+          "priority": "P0",
+          "description": "Consistency between agent answers and ground truth",
+          "calculation": "correct_answers / total_answers"
+        }
+      ]
+    },
+    {
+      "name": "Agent Performance",
+      "metrics": [
+        {
+          "name": "Task Success Rate",
+          "id": "agent_success_rate",
+          "priority": "P0",
+          "description": "End-to-end task execution success rate",
+          "calculation": "successful_tasks / total_tasks"
+        }
+      ]
+    }
+  ],
+  "test_sets": [
+    {
+      "name": "Core Functionality",
+      "path": "testsets/core.json"
+    },
+    {
+      "name": "Advanced Scenarios",
+      "path": "testsets/advanced.json"
+    }
+  ],
+  "evaluators": [
+    {
+      "type": "tool_calling",
+      "module": "evaluators/tool_calling.py"
+    },
+    {
+      "type": "memory",
+      "module": "evaluators/memory.py"
+    }
+  ],
+  "environments": [
+    {
+      "name": "Docker Base",
+      "type": "docker",
+      "config": "envs/dockers/base.Dockerfile"
+    }
+  ]
+}
