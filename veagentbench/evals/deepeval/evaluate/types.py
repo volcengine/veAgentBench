@@ -23,8 +23,9 @@ class TestResult:
     turns: Optional[List[TurnApi]] = None
     additional_metadata: Optional[Dict] = None
 
-
+from veagentbench.evals.deepeval.test_run.test_run import TestRun
 class EvaluationResult(BaseModel):
     test_results: List[TestResult]
     confident_link: Optional[str]
     test_run_id: Optional[str]
+    test_run: Optional[TestRun]

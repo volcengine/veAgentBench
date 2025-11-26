@@ -411,29 +411,29 @@ def print_test_result(test_result: TestResult, display: TestRunResultDisplay):
                 f"  - ✅ {metric_data.name} (score: {metric_data.score}, threshold: {metric_data.threshold}, strict: {metric_data.strict_mode}, evaluation model: {metric_data.evaluation_model}, reason: {metric_data.reason}, error: {metric_data.error})"
             )
 
-    print("")
-    if test_result.multimodal:
-        print("For multimodal test case:\n")
-        print(f"  - input: {test_result.input}")
-        print(f"  - actual output: {test_result.actual_output}")
+    # print("")
+    # if test_result.multimodal:
+    #     print("For multimodal test case:\n")
+    #     print(f"  - input: {test_result.input}")
+    #     print(f"  - actual output: {test_result.actual_output[:50]}...")
 
-    elif test_result.conversational:
-        print("For conversational test case:\n")
-        if test_result.turns:
-            print("  Turns:")
-            turns = sorted(test_result.turns, key=lambda t: t.order)
-            for t in turns:
-                print(format_turn(t))
-        else:
-            print("  - No turns recorded in this test case.")
+    # elif test_result.conversational:
+    #     print("For conversational test case:\n")
+    #     if test_result.turns:
+    #         print("  Turns:")
+    #         turns = sorted(test_result.turns, key=lambda t: t.order)
+    #         for t in turns:
+    #             print(format_turn(t))
+    #     else:
+    #         print("  - No turns recorded in this test case.")
 
-    else:
-        print("For test case:\n")
-        print(f"  - input: {test_result.input}")
-        print(f"  - actual output: {test_result.actual_output}")
-        print(f"  - expected output: {test_result.expected_output}")
-        print(f"  - context: {test_result.context}")
-        print(f"  - retrieval context: {test_result.retrieval_context}")
+    # else:
+    #     print("For test case:\n")
+    #     print(f"  - input: {test_result.input}")
+    #     print(f"  - actual output: {test_result.actual_output[:50]}...")
+    #     print(f"  - expected output: {test_result.expected_output[:50]}...")
+    #     print(f"  - context: {test_result.context[:50]}...")
+    #     print(f"  - retrieval context: {test_result.retrieval_context[:50]}...")
 
 
 def write_test_result_to_file(

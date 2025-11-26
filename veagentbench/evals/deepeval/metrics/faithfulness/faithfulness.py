@@ -1,5 +1,8 @@
 from typing import List, Optional, Union, Type
 import asyncio
+import functools
+import time
+from typing import Callable, Any
 
 from veagentbench.evals.deepeval.test_case import (
     LLMTestCase,
@@ -23,6 +26,76 @@ from veagentbench.evals.deepeval.metrics.faithfulness.schema import (
     Truths,
     Claims,
 )
+
+
+def retry(
+    max_attempts: int = 3,
+    delay: float = 1.0,
+    backoff: float = 2.0,
+    exceptions: tuple = (Exception,)
+) -> Callable:
+    """
+    重试装饰器
+    
+    Args:
+        max_attempts: 最大重试次数
+        delay: 初始延迟时间（秒）
+        backoff: 延迟时间的增长因子
+        exceptions: 需要重试的异常类型元组
+        
+    Returns:
+        装饰器函数
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            current_delay = delay
+            
+            for attempt in range(max_attempts):
+                try:
+                    return await func(*args, **kwargs)
+                except exceptions as e:
+                    last_exception = e
+                    if attempt < max_attempts - 1:
+                        print(f"函数 {func.__name__} 执行失败 (尝试 {attempt + 1}/{max_attempts}): {e}")
+                        print(f"等待 {current_delay} 秒后重试...")
+                        await asyncio.sleep(current_delay)
+                        current_delay *= backoff
+                    else:
+                        print(f"函数 {func.__name__} 执行失败 (尝试 {attempt + 1}/{max_attempts}): {e}")
+                        print("已达到最大重试次数，不再重试")
+            
+            raise last_exception
+        
+        @functools.wraps(func)
+        def sync_wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            current_delay = delay
+            
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    last_exception = e
+                    if attempt < max_attempts - 1:
+                        print(f"函数 {func.__name__} 执行失败 (尝试 {attempt + 1}/{max_attempts}): {e}")
+                        print(f"等待 {current_delay} 秒后重试...")
+                        time.sleep(current_delay)
+                        current_delay *= backoff
+                    else:
+                        print(f"函数 {func.__name__} 执行失败 (尝试 {attempt + 1}/{max_attempts}): {e}")
+                        print("已达到最大重试次数，不再重试")
+            
+            raise last_exception
+        
+        # 如果是异步函数，返回异步包装器，否则返回同步包装器
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
+    
+    return decorator
 
 
 class FaithfulnessMetric(BaseMetric):
@@ -99,6 +172,7 @@ class FaithfulnessMetric(BaseMetric):
 
             return self.score
 
+    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
     async def a_measure(
         self,
         test_case: LLMTestCase,

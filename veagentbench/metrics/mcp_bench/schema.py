@@ -15,19 +15,7 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from veagentbench.evals.deepeval.test_case import ToolCall
-
-class ToolExecutionResult(ToolCall):
-    """工具执行结果"""
-    # tool: str
-    # parameters: Dict[str, Any]
-    # discription: str = ""
-    # result: Optional[Any] = None
-    success: bool = False
-    server: str = "default"
-    execution_time: Optional[float] = None
-    error_message: Optional[str] = None
-    
-
+from veagentbench.test_case.agent_test_case import ToolExecutionResult, ToolCallExpected
 
 class MCPExecutionData(BaseModel):
     """MCP执行数据 - 专门存放工具调用相关信息"""

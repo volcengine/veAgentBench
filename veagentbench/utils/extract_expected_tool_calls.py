@@ -15,7 +15,7 @@
 from typing import List, Dict, Any, Optional
 import re
 from veagentbench.evals.deepeval.test_case import ToolCall
-
+from veagentbench.metrics.mcp_bench.schema import ToolCallExpected
 
 def parse_expected_tool_calls(text: str, text_expect_output: str) -> List[Dict[str, Any]]:
     """
@@ -23,16 +23,18 @@ def parse_expected_tool_calls(text: str, text_expect_output: str) -> List[Dict[s
     支持：
     - 每行一个工具调用，行首可有编号："1. "、"2. " 等
     - 工具名与内容用中文冒号 "：" 或英文冒号 ":" 分隔
-    - 键值参数格式：key="value"，兼容中文引号 “ ” 与英文引号 "
-    - 括号说明（如：（提取 “行业”））解析为 extraction_hint
+    - 键值参数格式：key="value"，兼容中文引号 " " 与英文引号 "
+    - 括号说明（如：（提取 "行业"））解析为 extraction_hint
     - 非键值参数的自然语言作为 description/query（当没有键值时作为 query）
+    - 如果包含mcp server 名称，则格式为 1. server_name.tool_name: ...
     返回结构：
     [
       {
         "tool_name": str,
         "parameters": dict,
         "description": Optional[str],
-        "extraction_hint": Optional[str]
+        "extraction_hint": Optional[str],
+        "server_name": Optional[str]  # 当包含 MCP server 名称时存在
       },
       ...
     ]
@@ -68,10 +70,21 @@ def parse_expected_tool_calls(text: str, text_expect_output: str) -> List[Dict[s
         else:
             # 无冒号无法解析为工具调用，跳过
             # 也可能是纯描述，不作为工具
-            continue
+            
+            tool_name = line
+            rest = ""
 
         tool_name = tool_name.strip()
         rest = rest.strip()
+
+        # 处理 MCP server 名称格式：server_name.tool_name
+        server_name: Optional[str] = None
+        actual_tool_name = tool_name
+        if "." in tool_name:
+            parts = tool_name.split(".", 1)
+            if len(parts) == 2 and parts[0] and parts[1]:
+                server_name = parts[0].strip()
+                actual_tool_name = parts[1].strip()
 
         # 提取括号说明（extraction_hint）
         extraction_hint: Optional[str] = None
@@ -103,9 +116,13 @@ def parse_expected_tool_calls(text: str, text_expect_output: str) -> List[Dict[s
                 parameters["query"] = rest_without_kv
 
         call: Dict[str, Any] = {
-            "tool_name": tool_name,
-            "parameters": parameters or {},
+            "name": actual_tool_name,
+            "input_parameters": parameters or {},
         }
+        if server_name:
+            call["server"] = server_name
+        else:
+            call["server"] = "default"
         if description:
             call["description"] = description
         if extraction_hint:
@@ -120,12 +137,12 @@ def parse_expected_tool_calls(text: str, text_expect_output: str) -> List[Dict[s
         expected_map = {}
 
     for idx, call in enumerate(calls, start=1):
-        tname = str(call.get("tool_name") or "").strip()
+        tname = str(call.get("name") or "").strip()
         exp = expected_map.get(idx)
         if exp is None and tname:
             exp = expected_map.get(tname)
         if exp is not None:
-            call["expected_output_raw"] = exp
+            call["output"] = exp
 
     return calls
 
@@ -186,18 +203,19 @@ def _parse_expected_outputs(text_expect_output: str) -> Dict[Any, str]:
     return mapping
 
 
-def turn_tool_dict2toolcall(tool_dict_list: List[Dict[str, Any]]) -> List[ToolCall]:
+def turn_tool_dict2toolcall(tool_dict_list: List[Dict[str, Any]]) -> List[ToolCallExpected]:
     """
     将工具调用的字典形式转换为标准的 ToolCall 结构
     """
     tool_list = []
     for tool in tool_dict_list:
         tool_list.append(
-            ToolCall(
+            ToolCallExpected(
                 name= tool.get("tool_name", "unknown_tool"),
                 input_parameters= tool.get("parameters", {}),
                 description= tool.get("description", ""),
                 output= tool.get("expected_output_raw", ""),
+                server= tool.get("server", "")
                 )
             )
     
@@ -205,6 +223,8 @@ def turn_tool_dict2toolcall(tool_dict_list: List[Dict[str, Any]]) -> List[ToolCa
 
 def turn_tool_toolcall2dict(tool_call_list: List[ToolCall]) -> List[Dict[str, Any]]:
     tool_dict_list = []
+    if not tool_call_list:
+        return tool_dict_list
     for tool in tool_call_list:
         tool_dict_list.append(
             {
@@ -219,15 +239,27 @@ def turn_tool_toolcall2dict(tool_call_list: List[ToolCall]) -> List[Dict[str, An
 
 # 简单自测
 if __name__ == "__main__":
-    sample = """1. vesearch：2023 年 4 月，国内互联网安全龙头（核心产品安全卫士，参与国家网络安全应急响应）创始人离婚分割近 90 亿元股权，查公司名称、股票代码、事件日期
-2. stock_zh_a_hist：symbol="601360"，period="daily"，start_date="20230404"，end_date="20230407"，adjust=""
-3. stock_individual_info_em：symbol="601360"（提取 “行业”）
-4. stock_board_industry_hist_em：symbol="软件开发"，start_date="20230404"，end_date="20230407"，period="daily"，adjust=""
-"""
-    sample_expect = """1. vesearch：2023 年 4 月 3 日，三六零（601360）披露《关于股东权益变动的提示性公告》，创始人离婚，分割 8.97 亿股（市值近 90 亿元），公司为国内互联网安全龙头，核心产品含 360 安全卫士
-2. stock_zh_a_hist：[{'日期': '2023-04-04', '股票代码': '601360', '开盘': 19.71, '收盘': 20.08}, {'日期': '2023-04-06', '股票代码': '601360', '开盘': 19.2, '收盘': 18.97}]
-3. stock_individual_info_em：[{'item': '行业', 'value': '软件开发'}]
-4. stock_board_industry_hist_em：[{'日期': '2023-04-04', '开盘': 959.09, '收盘': 960.94}, {'日期': '2023-04-06', '开盘': 946.1, '收盘': 947.17}]
-"""
+    
+    import pandas
     import json
-    print(json.dumps(parse_expected_tool_calls(sample, sample_expect), ensure_ascii=False, indent=2))
+    csv_file = 'example_dataset/mcptask/testcase.csv'
+    data = pandas.read_csv(csv_file)
+    
+    # 创建新列来存储解析结果
+    parsed_results = []
+    
+    for idx, row in data.iterrows():
+        # print(idx, row)
+        expe1 = row['expect_tools_calls']
+        expe2 = row['expect_tools_result']
+        res = parse_expected_tool_calls(expe1, expe2)
+        print(res)
+        res = json.dumps(res, ensure_ascii=False)
+        parsed_results.append(res)
+    
+    # 将解析结果添加到新列
+    data['parsed_tool_calls'] = parsed_results
+    
+    # 将结果写回原CSV文件
+    data.to_csv(csv_file, index=False)
+    print(f"已将解析结果写回到 {csv_file}，新增列 'parsed_tool_calls'")

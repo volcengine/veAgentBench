@@ -279,6 +279,7 @@ def evaluate(
             test_results=test_results,
             confident_link=confident_link,
             test_run_id=test_run_id,
+            test_run=global_test_run_manager.test_run
         )
     elif metric_collection:
         api = Api()

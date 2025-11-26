@@ -160,7 +160,9 @@ Use this as a reference to evaluate the appropriateness and accuracy of the agen
 ### Evaluation Guidance using EXPECTED TOOL CALLS
 If the "EXPECTED TOOL CALLS" section is provided above, you MUST use it as the ideal plan to evaluate:
 - Tool Appropriateness: Compare the agent's actual tools against the expected tools. Penalize missing expected tools, using wrong/irrelevant tools, or unnecessary extra tools.
-- Parameter Accuracy: For each expected tool, verify the agent's parameters (keys and values) against the expected ones. Penalize missing required parameters, incorrect values, extra irrelevant parameters, and wrong types.
+- Parameter Accuracy: 
+    - For each expected tool, verify the agent's parameters (keys and values) against the expected ones. Penalize missing required parameters, incorrect values, extra irrelevant parameters, and wrong types.
+    - If an expected tool call has no expected parameters, verify the agent's parameters against to the task context and avalible tools to determine if they are appropriate. Penalize missing required parameters, incorrect values, extra irrelevant parameters, and wrong types.
 - Dependency and Order: If the expected sequence implies dependencies, penalize incorrect ordering or ignored dependencies.
 - Redundancy: Penalize repeated or redundant calls that deviate from the expected minimal plan.
 

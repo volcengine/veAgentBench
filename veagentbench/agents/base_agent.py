@@ -3,12 +3,50 @@ from veadk import Agent, Runner
 
 from veadk.runner import RunnerMessage
 import asyncio
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from veadk.utils.logger import get_logger
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from veagentbench.agents.tracer import VeOpentelemetryTracer
 from veagentbench.agents.consts import DEFAULT_TRACE_DIR
 logger = get_logger(__name__)
+from abc import ABC, abstractmethod
+
+class AgentOutPut(BaseModel):
+    first_token_duration: Optional[float] = Field(
+        default = 0.0,
+        description= "agent响应首包延时" 
+    )
+    end2end_duration: Optional[float] = Field(
+        default = 0.0,
+        description= "agent响应整体延时"
+    )
+    tool_called: Optional[Dict[str, Any]] = Field(
+        default= None,
+        description= "agent工具调用相关结果"
+    )
+    final_response: Optional[str] = Field(
+        default= "",
+        description = "agent最终响应结果"
+    )
+    success: Optional[bool] = Field(
+        default = False
+    )
+        
+
+class BaseAgent(ABC):
+    '''
+        被测agent基类
+    '''
+    agent_name: str
+    @abstractmethod
+    def generate_output(self):
+        raise NotImplementedError
+    
+    @abstractmethod
+    def get_session(self):
+        raise NotImplementedError
+
+
 class TestResut(BaseModel):
     success: bool
     response: str

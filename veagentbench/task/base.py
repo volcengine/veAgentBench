@@ -13,7 +13,9 @@
 ## limitations under the License.
 
 from typing import List, Optional, Any
-
+from veagentbench.dataset.dataset import Dataset
+from veagentbench.agents.base_agent import BaseAgent
+from veagentbench.evals.deepeval.metrics.base_metric import BaseMetric
 class LLMAgentTestCaseRecord:
     def __init__(self, test_case_id: str, trace_file_path: str, resoponse: str):
         self.test_case_id = test_case_id
@@ -22,18 +24,22 @@ class LLMAgentTestCaseRecord:
 
 class BaseTask:
 
-    def __init__(self, task_name: str):
+    def __init__(
+        self, 
+        task_name: str,
+        metrics: List[BaseMetric],
+        datasets: List[Dataset],
+        agent: Optional[BaseAgent]=None,
+        
+        
+    ):
         self.task_name = task_name
-        self.metrics = []
+        self.metrics = metrics
         self.dataset : List[str]= None
         self.output_dir : str = './output'
-        self.agents: Optional[Any] = []
-
-
-    @classmethod
-    def evaluate(self, predictions, references):
-        raise NotImplementedError("Subclasses should implement this method.")
-
+        self.agent = agent
+        self.datasets = datasets
+        self.test_env = None   #评测环境，预留
 
     @classmethod
     def load_data(self, data_path: str):

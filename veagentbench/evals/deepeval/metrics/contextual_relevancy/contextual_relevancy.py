@@ -19,7 +19,7 @@ from veagentbench.evals.deepeval.metrics.contextual_relevancy.template import (
 )
 from veagentbench.evals.deepeval.metrics.indicator import metric_progress_indicator
 from veagentbench.evals.deepeval.metrics.contextual_relevancy.schema import *
-
+from veagentbench.evals.deepeval.metrics.faithfulness.faithfulness import retry
 
 class ContextualRelevancyMetric(BaseMetric):
     _required_params: List[LLMTestCaseParams] = [
@@ -213,7 +213,8 @@ class ContextualRelevancyMetric(BaseMetric):
 
         score = relevant_statements / total_verdicts
         return 0 if self.strict_mode and score < self.threshold else score
-
+    
+    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
     async def _a_generate_verdicts(
         self, input: str, context: List[str]
     ) -> ContextualRelevancyVerdicts:

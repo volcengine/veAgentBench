@@ -1,133 +1,300 @@
 # veAgentBench
 
+<a href="https://huggingface.co/datasets/bytedance-research/veAgentBench" target="_blank">
+    <img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-yellow.svg?style=for-the-badge"
+         alt="Hugging Face Dataset" />
+</a>
+
 ![veAgentBench Logo](assets/veagentbench_logo.jpeg)
 
-**veAgentBench** 是面向AI Agent生态的专业评估框架，提供LLM裁判评分、多维度指标分析、工具调用匹配等核心能力，配套完整的端到端分析报表系统，助力构建可信的智能体评测体系。
+**veAgentBench** 是面向AI Agent生态的专业评估框架，内置评估工具和数据集，提供LLM裁判评分、多维度指标分析、工具调用匹配等核心能力，配套完整的端到端分析报表系统，助力构建可信的智能体评测体系。
 
 ## 🚀 最新发布
 
-[2025/11/12] 🔥 **veAgentBench 正式开源** - 企业级AI Agent评估解决方案
+[2025/11/12] 🔥 **veAgentBench 正式开源工具+评测集** - 企业级AI Agent评估解决方案
 
-## 🎯 核心优势
+## 项目介绍
 
-- **📊 多维度评估体系**：集成LLM裁判评分、工具匹配度、响应质量等全方位指标
-- **🔍 深度指标分析**：提供细粒度的性能分解和中间指标透出
-- **📈 可视化报表**：自动生成专业的分析报告，支持多格式输出
-- **⚡ 高性能架构**：支持并发评测，优化评估效率
-- **🔧 灵活扩展**：模块化设计，支持自定义评估指标和维度
+### 🎯 核心优势
 
-## 🛠️ 环境要求
+- **多维度评估体系**：集成LLM裁判评分、工具匹配度、响应质量等全方位指标
+- **深度指标分析**：提供细粒度的性能分解和中间指标透出
+- **可视化报表**：自动生成专业的分析报告，支持多格式输出
+- **高性能架构**：支持并发评测，优化评估效率
+- **灵活扩展**：模块化设计，支持自定义评估指标和维度
+- **支持多种评测对象接入**：本地开发对象、http+sse、a2a
+
+### 内置评测集
+
+配套法律、教育、金融分析、个人助理评测数据，支持一键引用评测。数据集详细介绍见:[veAgentBench-data](https://huggingface.co/datasets/bytedance-research/veAgentBench)
+
+## 快速开始
+
+### 环境要求
 
 - **Python**: 3.10+
 - **环境管理**: 推荐使用虚拟环境
 - **依赖管理**: 支持uv/pip等主流工具
 
-## 📦 快速安装
+### 安装
 
 ```bash
 pip install git+https://code.byted.org/iaas/veAgentBench.git
 ```
 
-## 🚀 快速开始
+### 命令行使用指南
 
-### 1. 环境配置
-
-#### 安装uv（可选，推荐）
+#### 查看帮助信息
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+veagentbench --help
 ```
 
-#### 配置环境变量
+#### 查看基本信息
 
 ```bash
-export VOLCEMODEL=          # 大模型推理接入点
-export VOLCEBASEURL=        # 大模型推理baseurl
-export ARK_API_KEY=         # 大模型推理API_KEY
-export MAX_CONCURRENCY="5"  # 评测并发数
-export VEAB_CACHE_DIR=".cache/veagentbench"  # 缓存目录
+# 查看可用指标
+veagentbench info --metrics
+
+# 查看可用代理
+veagentbench info --agents
+
+# 查看配置模板类型
+veagentbench info --templates
 ```
 
-#### 开通火山方舟服务
-
-默认使用 [Doubao-1.5-pro-32k](https://cloud.bytedance.net/ark/region:ark+cn-beijing/model/detail?Id=doubao-1-5-pro-32k) 模型
-参考文档：[部署在线推理点](https://www.volcengine.com/docs/82379/1182403)
-
-### 2. 安装依赖
+#### 生成基础配置
 
 ```bash
-uv sync  # 或 pip install -r requirements.txt
+veagentbench config generate --task-name my_test --output my_config.yaml
 ```
 
-## 📊 评测方法
-
-### 评测数据
-
-1. **法律援助子数据集**（250个问题）：聚焦考察Agent的知识检索分层能力——优先从RAG知识库精准提取法律信息，当RAG覆盖不足时触发联网检索，确保回答准确性与时效性；
-2. **财务分析子数据集**（57个问题）：重点验证Agent的多工具协同深度研究能力，考察其根据财务场景需求选择工具、组合调用流程及输出分析结论的能力；
-3. **教育辅导子数据集**（74个问题）：增加RAG的数量级，进一步验证RAG提取信息的精确度，同时考察Agent通过memory获取关键信息的能力。
-
-### 🎯 基于trace的评测
-
-基于已有trace数据进行评估分析，适合结果复盘和性能分析场景。
-
-#### 数据准备
-
-准备Agent执行后的trace文件和eval_set文件，参考 `example_dataset/`
-
-#### 执行评测
+#### 并行执行（默认）
 
 ```bash
-# 运行评测
-uv run examples/mcptest.py
-
-# 提取指标
-uv run veagentbench/report/extract_metrics_corrected.py -o metrics_out -d
+veagentbench run --config my_config.yaml --parallel
 ```
 
-#### 输出结果
+#### 顺序执行
 
-- `metrics_out_detailed.csv` - 详细评测数据
-- `metrics_out_metrics_only.csv` - 核心指标
-- `metrics_out_summary.json` - 统计摘要
-- `metrics_out_report.html` - 可视化报告
-
-### 🌐 动态评测
-
-实时调用Agent进行动态评估，适合开发调试和性能监控场景。
-
-#### Agent开发
-
-```python
-from veadk import Agent, Runner
-
-# 定义工具函数
-def stock_sse_summary():
-    """上交所股票数据总貌查询接口"""
-    # 工具实现逻辑
-    pass
-
-# 创建评测Agent
-agent = Agent(
-    name="financial_deep_research",
-    instruction='财务分析专家，擅长股票数据统计分析',
-    tools=[vesearch, stock_sse_summary],
-)
+```bash
+veagentbench run --config my_config.yaml --sequential
 ```
 
-#### 执行评测
+### 配置文件说明
 
-```python
-from veagentbench.task.mcp_task.mcptask import MCPTaskOnline
-
-task = MCPTaskOnline(
-    agents=[agent],
-    task_name='金融分析场景',
-    testset_file='example_dataset/mcptask/testcase.csv',
-    enable_cache=True
-)
-task.evaluate()
+```yaml
+tasks:
+  - name: legal_assistant    # 评测任务名称
+    datasets:
+      - name: bytedance-research/veAgentBench   # 测试集名称
+        description: 法律援助助手                 # 测试集描述
+        property:                               # 测试集相关属性
+          type: huggingface                     # 测试集类型，支持csv、huggingface
+          config_name: legal_aid   
+          split: "test[:1]"          
+          input_column: "input"
+          expected_output_column: "expect_output"
+    metrics:                                    # 评测指标
+      - AnswerCorrectnessMetric
+    judge_model:                   # 裁判模型配置
+      model_name: "gpt-4"          # 模型名称
+      base_url: "https://api.openai.com/v1"  # OpenAPI的base_url
+      api_key: "your_api_key"      # API密钥（需要替换）
+    agent:                         # 被测Agent配置
+      type: AdkAgent              # 被测Agent类型：AdkAgent/LocalAdkAgent/A2AAgent
+      property:
+        agent_name: "financial_analysis_agent"  # Agent名称
+        end_point: "http://127.0.0.1:8000/invoke"  # 调用端点
+        api_key: "your_api_key"     # Agent API密钥（需要替换）
+    max_concurrent: 5              # 调用被测agent并发数
+    measure_concurrent: 100        # 评测并发数：100个样本
+    cache_dir: "./cache"           # 缓存目录路径
 ```
+
+#### 测试集配置说明
+
+##### HuggingFace测试集配置
+
+```yaml
+    datasets:
+      - name: bytedance-research/veAgentBench   # HuggingFace测试集名称
+        description: 金融分析测试集
+        property:
+          type: huggingface                    # 测试集类型
+          config_name: financial_analysis      # subset名称
+          split: "test[:1]"                    # split，可以不用填，如果要跑少量case，可以指定
+          input_column: "input"                 # 输入列名
+          expected_output_column: "expect_output"   # 预期响应列名
+          expected_tool_call_column: "expected_tool_calls"  # 预期工具调用列名
+```
+
+##### 本地CSV文件测试集配置
+
+```yaml
+    datasets:
+      - name: legal                     # 测试集名称
+        description: 法律咨询客服评测集    # 测试集描述
+        property:
+          type: csv                     # 测试集类型
+          csv_file_path: "dataset/test1.csv"       # 测试集本地文件
+          input_column: "input"                    # 输入列名
+          expected_output_column: "expect_output"   # 预期响应列名
+          expected_tool_call_column: "expected_tool_calls"    # 预期工具调用列名
+```
+
+#### 被测对象agent配置说明
+
+##### agentkit platform agent接入
+
+```yaml
+    agent:                         # 被测Agent配置
+      type: AdkAgent              # 被测Agent类型：AdkAgent/LocalAdkAgent/A2AAgent
+      property:
+        agent_name: "financial_analysis_agent"  # Agent名称
+        end_point: "http://127.0.0.1:8000/invoke"  # 调用端点
+        api_key: "your_api_key"     # Agent API密钥（需要替换）
+```
+
+##### 本地通过agentkit开发的agent对象
+
+```yaml
+  agent:
+    type: LocalAdkAgent   
+    property:
+      agent_name: local_finantial_agent  
+      agent_dir_path: "agents/legal"        # 本地agent对象目录
+```
+
+### 离线评测
+
+离线评测适用于已有评测数据的场景，适合上线前的效果准出评测。
+
+#### 内置Benchmark评测集评测
+
+veAgentBench 提供了内置评测数据集，覆盖多个专业领域：
+
+**1. 准备评测配置**
+
+准备评测配置test_config.yaml，示例参考如下：
+
+**财务分析评测配置：**
+
+```yaml
+tasks:
+  - name: financial_analysis_test
+    datasets:
+      - name: bytedance-research/veAgentBench   # HuggingFace测试集名称
+        description: 金融分析测试集
+        property:
+          type: huggingface
+          config_name: financial_analysis      # subset名称
+          split: "test[:1]"                    # split，可以不用填，如果要跑少量case，可以指定
+          input_column: "input"
+          expected_output_column: "expect_output"
+          expected_tool_call_column: "expected_tool_calls"
+    metrics: ["MCPToolMetric"]
+    judge_model:                   # 裁判模型配置
+      model_name: "gpt-4"          # 模型名称
+      base_url: "https://api.openai.com/v1"  # OpenAPI的base_url
+      api_key: "your_api_key"      # API密钥（需要替换）
+    agent:                         # 被测Agent配置
+      type: AdkAgent              # 被测Agent类型：AdkAgent/LocalAdkAgent/A2AAgent
+      property:
+        agent_name: "financial_analysis_agent"  # Agent名称
+        end_point: "http://127.0.0.1:8000/invoke"  # 调用端点
+        api_key: "your_api_key"     # Agent API密钥（需要替换）
+    max_concurrent: 5              # 调用被测agent并发数
+    measure_concurrent: 100        # 评测并发数：100个样本
+    cache_dir: "./cache"           # 缓存目录路径
+```
+
+**法律援助评测配置：**
+
+```yaml
+tasks:
+  - name: legal_assistant
+    datasets:
+      - name: bytedance-research/veAgentBench   # HuggingFace测试集名称
+        description: 法律援助助手
+        property:
+          type: huggingface
+          config_name: legal_aid       # subset名称
+          split: "test[:1]"                    # split，可以不用填，如果要跑少量case，可以指定
+          input_column: "input"
+          expected_output_column: "expect_output"
+    metrics:
+      - AnswerCorrectnessMetric
+      - AnswerRelevancyMetric
+      - ContextualPrecisionMetric
+      - ContextualRecallMetric
+      - FaithfulnessMetric
+      - ContextualRelevancyMetric
+    judge_model:                   # 裁判模型配置
+      model_name: "gpt-4"          # 模型名称
+      base_url: "https://api.openai.com/v1"  # OpenAPI的base_url
+      api_key: "your_api_key"      # API密钥（需要替换）
+    agent:                         # 被测Agent配置
+      type: AdkAgent              # 被测Agent类型：AdkAgent/LocalAdkAgent/A2AAgent
+      property:
+        agent_name: "financial_analysis_agent"  # Agent名称
+        end_point: "http://127.0.0.1:8000/invoke"  # 调用端点
+        api_key: "your_api_key"     # Agent API密钥（需要替换）
+    max_concurrent: 5              # 调用被测agent并发数
+    measure_concurrent: 100        # 评测并发数：100个样本
+    cache_dir: "./cache"           # 缓存目录路径
+```
+
+**2. 准备被测对象**
+
+参照[veAgentBench-agent](https://huggingface.co/datasets/bytedance-research/veAgentBench/tree/main/agents) 对应的agents文件，在本地开发，或部署到火山agentkit platform进行评测。
+
+**3. 执行测试命令**
+
+```bash
+veagentbench run --config test_config.yaml  --parallel
+```
+
+#### 自定义数据集评测
+
+支持用户使用自己的数据集进行评测，灵活适应各种业务场景：
+
+**1. 数据格式要求**
+
+- **CSV格式**：支持本地CSV文件，包含输入、期望输出、期望工具调用等列
+- **HuggingFace格式**：支持从HuggingFace Hub加载数据集
+
+**2. 配置自定义数据集**
+
+```yaml
+# CSV数据集配置示例，一般要求必须有input_column、expected_output_column，
+datasets:
+  - name: custom_testset
+    property:
+      type: csv  # 数据集类型：csv/huggingface/trace
+      csv_file_path: "path/to/your/dataset.csv"  # 数据文件路径
+      input_column: "question"  # 输入列名
+      expected_output_column: "expected_answer"  # 期望输出列名
+      expected_tool_call_column: "expected_tools"  # 期望工具调用列名
+```
+
+**3. 执行测试命令**
+
+```bash
+veagentbench run --config test_config.yaml  --parallel
+```
+
+### 在线评测（预留）
+
+在线评测功能正在开发中，将支持实时调用Agent进行动态评估，适合在线agent性能监控场景。
+
+**即将支持的功能：**
+
+- 🔌 实时Agent调用和评测
+- 📊 动态性能监控
+- ⚡ 开发调试支持
+- 🔄 持续集成集成
+- 📈 实时指标展示
 
 ## 🗺️ 产品路线图
 

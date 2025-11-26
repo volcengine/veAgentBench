@@ -26,7 +26,7 @@ class VolceOpenAI(GPTModel):
         cost_per_input_token: Optional[float] = None,
         cost_per_output_token: Optional[float] = None,
         temperature: float = 0,
-        generation_kwargs: Optional[Dict] = None,
+        generation_kwargs: Optional[Dict] = {'max_tokens': 20480},
         **kwargs,
     ):
         global valid_gpt_models, structured_outputs_models

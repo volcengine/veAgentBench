@@ -32,9 +32,12 @@ from veagentbench.evals.deepeval.utils import (
 )
 from veagentbench.evals.deepeval.test_run.cache import global_test_run_cache_manager
 from veagentbench.evals.deepeval.constants import CONFIDENT_TEST_CASE_BATCH_SIZE, HIDDEN_DIR
-
-TEMP_FILE_PATH = f"{HIDDEN_DIR}/.temp_test_run_data.json"
-LATEST_TEST_RUN_FILE_PATH = f"{HIDDEN_DIR}/.latest_test_run.json"
+from  datetime import datetime
+from uuid import uuid4
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+session = str(uuid4())
+TEMP_FILE_PATH = f"{HIDDEN_DIR}/.temp_test_run_data-{timestamp}-{session}.json"
+LATEST_TEST_RUN_FILE_PATH = f"{HIDDEN_DIR}/.latest_test_run-{timestamp}-{session}.json"
 LATEST_TEST_RUN_DATA_KEY = "testRunData"
 LATEST_TEST_RUN_LINK_KEY = "testRunLink"
 console = Console()
@@ -966,9 +969,7 @@ class TestRunManager:
                 f"\n\n[rgb(5,245,141)]✓[/rgb(5,245,141)] Evaluation completed 🎉! (time taken: {round(runDuration, 2)}s | token cost: {test_run.evaluation_cost} USD)\n"
                 f"» Test Results ({test_run.test_passed + test_run.test_failed} total tests):\n",
                 f"  » Pass Rate: {round((test_run.test_passed / (test_run.test_passed + test_run.test_failed)) * 100, 2)}% | Passed: [bold green]{test_run.test_passed}[/bold green] | Failed: [bold red]{test_run.test_failed}[/bold red]\n\n",
-                "=" * 80,
-                "\n\n» What to share evals with your team, or a place for your test cases to live? ❤️ 🏡\n"
-                "  » Run [bold]'deepeval view'[/bold] to analyze and save testing results on [rgb(106,0,255)]Confident AI[/rgb(106,0,255)].\n\n",
+                "=" * 80
             )
 
     def get_latest_test_run_data(self) -> Optional[TestRun]:

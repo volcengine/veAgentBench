@@ -963,3 +963,10 @@ def _add_execution_order(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any
         call.pop('_sort_key', None)
     
     return sorted_calls
+
+
+if __name__ == "__main__":
+    with open('dataset/mcp/tmp/veadk_opentelemetry_tracer_veadk_default_user_financial_deep_research_1_425992b64225f91fb71ae9d611817b98.json', encoding='utf8', mode='r') as f:
+        trace_data = json.load(f)
+        tools_result = extract_tool_calls_from_trace(trace_data)
+        print(json.dumps(tools_result[1], indent=2, ensure_ascii=False))

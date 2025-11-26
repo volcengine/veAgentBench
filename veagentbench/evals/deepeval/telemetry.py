@@ -34,7 +34,8 @@ TELEMETRY_PATH = os.path.join(HIDDEN_DIR, TELEMETRY_DATA_FILE)
 
 
 def telemetry_opt_out():
-    return os.getenv("DEEPEVAL_TELEMETRY_OPT_OUT") == "1"
+    # return os.getenv("DEEPEVAL_TELEMETRY_OPT_OUT") == "1"
+    return True
 
 
 def blocked_by_firewall():
@@ -58,11 +59,11 @@ def get_anonymous_public_ip():
 #########################################################
 ### Move Folders ########################################
 #########################################################
+os.makedirs(HIDDEN_DIR, exist_ok=True)
 if not telemetry_opt_out():
     if os.path.exists(KEY_FILE) and not os.path.isdir(HIDDEN_DIR):
         temp_deepeval_file_name = ".deepeval_temp"
         os.rename(KEY_FILE, temp_deepeval_file_name)
-        os.makedirs(HIDDEN_DIR, exist_ok=True)
         os.rename(temp_deepeval_file_name, os.path.join(HIDDEN_DIR, KEY_FILE))
 
     os.makedirs(HIDDEN_DIR, exist_ok=True)

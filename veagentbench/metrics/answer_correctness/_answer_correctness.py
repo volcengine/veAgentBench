@@ -44,7 +44,7 @@ class AnswerCorrectnessMetric(BaseMetric):
 
     def __init__(
         self,
-        threshold: float = 0.5,
+        threshold: float = 0.25,
         model: Optional[Union[str, DeepEvalBaseLLM]] = None,
         include_reason: bool = True,
         async_mode: bool = True,

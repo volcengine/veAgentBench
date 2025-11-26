@@ -128,7 +128,7 @@ class MCPToolMetric(BaseMetric):
         self.reason = ""
         self.execution_data = None
 
-    def measure(self, test_case: AgentTestCase, execution_data: Optional[MCPExecutionData] = None) -> float:
+    def measure(self, test_case: AgentTestCase) -> float:
         """同步评估方法
         
         Args:
@@ -144,9 +144,9 @@ class MCPToolMetric(BaseMetric):
         with metric_progress_indicator(self):
             if self.async_mode:
                 loop = get_or_create_event_loop()
-                loop.run_until_complete(self.a_measure(test_case, test_case.execution_data))
+                loop.run_until_complete(self.a_measure(test_case))
             else:
-                self._measure(test_case, execution_data)
+                self._measure(test_case)
 
         return self.score
 
@@ -214,8 +214,7 @@ class MCPToolMetric(BaseMetric):
         llm_scores = self._evaluate_with_llm_judge(
             test_case.input,
             test_case.actual_output,
-            getattr(test_case, 'expected_output', None),
-            self.execution_data
+            getattr(test_case, 'expected_output', None)
         )
         self._update_llm_scores(llm_scores)
         
@@ -240,8 +239,7 @@ class MCPToolMetric(BaseMetric):
         llm_scores = await self._a_evaluate_with_llm_judge(
             test_case.input,
             test_case.actual_output,
-            getattr(test_case, 'expected_output', None),
-            self.execution_data,
+            getattr(test_case, 'expected_output', None)
         )
         self._update_llm_scores(llm_scores)
         
@@ -313,23 +311,23 @@ class MCPToolMetric(BaseMetric):
             return False
 
 
-    async def _synthesize_final_solution(self, task: str, execution_data: MCPExecutionData) -> str:
-        """
-        参照mcp-bench的_synthesize_final_solution方法，基于工具执行结果生成最终答案
-        
+
+    def generate_accumulated_info(self, task: str) -> str:
+        """_summary_
+
         Args:
-            task: 原始用户任务
-            execution_data: 工具执行数据
-            
+            task (str): _description_
+            execution_data (MCPExecutionData): _description_
+
         Returns:
-            基于工具执行结果综合生成的最终答案
+            str: _description_
         """
+        execution_data = self.execution_data
         if not execution_data or not execution_data.tool_executions:
             return "无法完成任务：没有可用的工具执行结果。"
         
         # 参照mcp-bench的_update_state方法构建详细的累积信息
         accumulated_info = []
-        total_executions = len(execution_data.tool_executions)
         
         # 按轮次组织工具执行信息（如果有轮次信息）
         rounds_info: Dict[int, List[ToolExecutionResult]] = {}
@@ -408,6 +406,22 @@ class MCPToolMetric(BaseMetric):
         
         accumulated_information = "\n".join(accumulated_info)
         self.execution_data.accumulated_information = accumulated_information
+
+
+    async def _synthesize_final_solution(self, task) -> str:
+        """
+        参照mcp-bench的_synthesize_final_solution方法，基于工具执行结果生成最终答案
+        
+        Args:
+            task: 原始用户任务
+            execution_data: 工具执行数据
+            
+        Returns:
+            基于工具执行结果综合生成的最终答案
+        """
+        total_executions = len(self.execution_data.tool_executions)
+        accumulated_information = self.execution_data.accumulated_information or ""
+
         # 构建综合提示词（参照mcp-bench的实现）
         system_prompt = """你是一个专业的解决方案综合器，负责为多工具AI代理执行生成最终答案。
 你的任务是基于工具执行结果，为用户提供清晰、全面、结构化的最终答案。"""
@@ -448,67 +462,62 @@ class MCPToolMetric(BaseMetric):
             else:
                 return f"任务执行遇到问题，{total_executions} 次工具调用均未成功。"
 
-    def _evaluate_with_llm_judge(self, task: str, actual_output: str, expected_output: str = None, 
-                                execution_data: MCPExecutionData = None) -> Dict[str, Any]:
+    def _evaluate_with_llm_judge(self, task: str, actual_output: str, expected_output: str = None) -> Dict[str, Any]:
         """使用LLM评判进行评估（同步），支持judge stability增强评分可信度"""
         # 创建执行摘要
-        execution_summary = self._create_execution_summary(execution_data)
-        
+        self.generate_accumulated_info(task)
         # 根据mcp-bench的实现，如果没有提供actual_output或者需要生成final_solution
         # 我们基于execution_data生成final_solution
         if not actual_output or actual_output.strip() == "":
             # 同步版本：使用异步方法的同步包装
-            import asyncio
-            try:
-                loop = asyncio.get_event_loop()
-                final_solution = loop.run_until_complete(self._synthesize_final_solution(task, execution_data))
-            except RuntimeError:
-                # 如果没有事件循环，创建一个新的
-                final_solution = asyncio.run(self._synthesize_final_solution(task, execution_data))
+            # import asyncio
+            # try:
+            #     loop = asyncio.get_event_loop()
+            #     final_solution = loop.run_until_complete(self._synthesize_final_solution(task, execution_data))
+            # except RuntimeError:
+            #     # 如果没有事件循环，创建一个新的
+            #     final_solution = asyncio.run(self._synthesize_final_solution(task, execution_data))
+            final_solution = ''
         else:
             final_solution = actual_output
-        
-        # 检查是否启用judge stability
-        # if getattr(self, 'enable_judge_stability', False):
-        #     return self._evaluate_with_stability_testing(task, final_solution, execution_summary, execution_data)
-        
+        execution_summary = self._create_execution_summary(self.execution_data)
+
         # 标准单次评估
         prompt = self.evaluation_template.evaluate_llm_judge_dimensions(
             task=task,
             final_solution=final_solution,
             execution_summary=execution_summary,
-            total_rounds=execution_data.total_rounds if execution_data else 1,
+            total_rounds=self.execution_data.total_rounds if self.execution_data else 1,
             available_tools=self.available_tools,
-            concrete_task_description=execution_data.concrete_task_description if execution_data else None,
-            dependency_analysis=execution_data.dependency_analysis if execution_data else None,
-            expected_tool_calls=getattr(execution_data, 'expected_tool_calls', None) if execution_data else None
+            concrete_task_description=self.execution_data.concrete_task_description if self.execution_data else None,
+            dependency_analysis=self.execution_data.dependency_analysis if self.execution_data else None,
+            expected_tool_calls=getattr(self.execution_data, 'expected_tool_calls', None) if self.execution_data else None
         )
         
-        print(prompt)
-        
         if self.using_native_model:
-            res = self.model.generate(prompt)
+            res, cost = self.model.generate(prompt)
+            self.evaluation_cost += cost
         else:
-            res = self.model.generate(prompt)
-            self.evaluation_cost += self.model.cost
+            res, cost = self.model.generate(prompt)
+
 
         data = trimAndLoadJson(res, self)
         return data
 
-    async def _a_evaluate_with_llm_judge(self, task: str, actual_output: str, expected_output: str = None,
-                                        execution_data: MCPExecutionData = None) -> Dict[str, Any]:
+    async def _a_evaluate_with_llm_judge(self, task: str, actual_output: str, expected_output: str = None) -> Dict[str, Any]:
         """使用LLM评判进行评估（异步）"""
         # 根据mcp-bench的实现，如果没有提供actual_output或者需要生成final_solution
         # 我们基于execution_data生成final_solution
         
         # _final_solution = await self._synthesize_final_solution(task, execution_data)
+        self.generate_accumulated_info(task)
         _final_solution = ''
         if not actual_output or actual_output.strip() == "":
             final_solution = _final_solution
         else:
             final_solution = actual_output
         # 创建执行摘要
-        execution_summary = self._create_execution_summary(execution_data)
+        execution_summary = self._create_execution_summary(self.execution_data)
         
         
 
@@ -516,10 +525,10 @@ class MCPToolMetric(BaseMetric):
             task=task,
             final_solution=final_solution,
             execution_summary=execution_summary,
-            total_rounds=execution_data.total_rounds if execution_data else 1,
+            total_rounds=self.execution_data.total_rounds if self.execution_data else 1,
             available_tools=self.available_tools,
-            concrete_task_description=execution_data.concrete_task_description if execution_data else None,
-            dependency_analysis=execution_data.dependency_analysis if execution_data else None,
+            concrete_task_description=self.execution_data.concrete_task_description if self.execution_data else None,
+            dependency_analysis=self.execution_data.dependency_analysis if self.execution_data else None,
             expected_tool_calls=self.execution_data.expected_tool_calls
         )
 
@@ -619,9 +628,9 @@ class MCPToolMetric(BaseMetric):
         self.parallelism_and_efficiency = llm_scores.get('parallelism_and_efficiency', 0.0) if llm_scores.get('parallelism_and_efficiency') != None else 0.0 
         
         # 计算聚合分数
-        # self.task_completion_score = (self.task_fulfillment + self.grounding) / 2
-        # self.tool_selection_score = (self.tool_appropriateness + self.parameter_accuracy) / 2
-        # self.planning_effectiveness_score = (self.dependency_awareness + self.parallelism_and_efficiency) / 2
+        self.task_completion_score = (self.task_fulfillment + self.grounding) / 2
+        self.tool_selection_score = (self.tool_appropriateness + self.parameter_accuracy) / 2
+        self.planning_effectiveness_score = (self.dependency_awareness + self.parallelism_and_efficiency) / 2
         
         self.score_breakdown = {
             'task_fulfillment': self.task_fulfillment,
@@ -635,7 +644,7 @@ class MCPToolMetric(BaseMetric):
             # 'planning_effectiveness_score': self.planning_effectiveness_score,
             'input_schema_compliance': self.input_schema_compliance,
             'valid_tool_name_rate': self.valid_tool_name_rate,
-            # 'execution_success_rate': self.execution_success_rate,
+            'execution_success_rate': self.execution_success_rate,
             # 'valid_call_failure_rate': self.valid_call_failure_rate,
             # 'planning_json_compliance': self.planning_json_compliance,
         }
@@ -668,7 +677,6 @@ class MCPToolMetric(BaseMetric):
             self.valid_tool_name_rate,
             self.execution_success_rate,
             (1 - self.valid_call_failure_rate),  # 转换为正向指标
-            # self.planning_json_compliance
         ]
         
         # 过滤None值
