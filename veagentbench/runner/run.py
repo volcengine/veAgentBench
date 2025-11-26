@@ -1,3 +1,18 @@
+## Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##     http:##www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+
+
 from veagentbench.task.task import AgentTask
 from veagentbench.dataset.dataset import Dataset
 from veagentbench.models.models import VolceOpenAI
@@ -81,10 +96,11 @@ class AgentTestRunner:
                 expected_column=property_config.get('expected_output_column', 'expected_output'),
                 expected_tool_call_column=property_config.get('expected_tool_call_column', 'expected_tool_calls')
             )
-        elif load_type == 'json':
+        elif load_type == 'huggingface':
             dataset.load(
-                load_type='json',
-                json_file=property_config.get('json_file_path', ''),
+                load_type='huggingface',
+                config_name=property_config.get('config_name', ''),
+                split=property_config.get('split', 'test'),
                 input_key=property_config.get('input_key', 'input'),
                 expected_key=property_config.get('expected_key', 'expected_output'),
                 expected_tool_call_key=property_config.get('expected_tool_call_key', 'expected_tool_calls')

@@ -1,8 +1,23 @@
+## Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##     http:##www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+
 import pandas as pd
 import json
 from pydantic import BaseModel, Field
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
+from datasets import load_dataset, DatasetDict
 
 class Dataset():
     """
@@ -22,7 +37,7 @@ class Dataset():
         self,
         load_type: str = Field(
             default='csv',
-            examples = ['csv', 'trace_local', 'trace_cloud', 'benchmark'],
+            examples = ['csv', 'trace_local', 'trace_cloud', 'huggingface'],
             description='数据载入类型'
         ),
         **kwargs
@@ -32,6 +47,8 @@ class Dataset():
         """
         if load_type == 'csv':
             self.testcases = self.from_csv(**kwargs)
+        elif load_type == 'huggingface':
+            self.testcases = self.from_huggingface(**kwargs)
             
 
     def get_testcase(self):
@@ -191,16 +208,166 @@ class Dataset():
         """
         pass
 
-    @abstractmethod
-    def from_benchmark(self):
+    def from_huggingface(
+        self,
+        config_name: str,
+        split: str='test',
+        input_column: str = "input",
+        expected_column: Optional[str] = "expect_output",
+        expected_tool_call_column: Optional[str] = "expected_tool_calls",
+        available_tools_column: Optional[str] = "available_tools",
+        context_column: Optional[str] = "context",
+        id_column: Optional[str] = None,
+        **load_kwargs
+    ) -> List[Dict[str, Any]]:
         """
-        从基准测试加载数据集
+        从Hugging Face数据集加载测试用例
+        
+        Args:
+            input_column: 输入列名
+            expected_column: 预期输出列名
+            expected_tool_call_column: 预期工具调用列名
+            available_tools_column: 可用工具列名
+            context_column: 上下文列名
+            id_column: ID列名（如果不提供，将使用索引）
+            **load_kwargs: 传递给load_dataset的其他参数
+            
+        Returns:
+            List[Dict]: 包含测试用例的列表
         """
-        pass
+        try:
+            # 从Hugging Face Hub加载数据集
+            if config_name:
+                dataset_dict = load_dataset(
+                    self.name, 
+                    config_name, 
+                    split=split,
+                )
+            else:
+                dataset_dict = load_dataset(
+                    self.name, 
+                    split=split,
+                )
+            
+            # 确保我们有一个Dataset对象
+            if isinstance(dataset_dict, DatasetDict):
+                self.hf_dataset = dataset_dict[split]
+            else:
+                self.hf_dataset = dataset_dict
+            
+            # 获取数据集的特征（列名）
+            features = self.hf_dataset.features
+            def _find_column( features, preferred_column: str, fallback_columns: List[str]) -> Optional[str]:
+                """
+                查找列名，如果首选列不存在，则尝试备选列
+                
+                Args:
+                    features: 数据集的特征
+                    preferred_column: 首选列名
+                    fallback_columns: 备选列名列表
+                    
+                Returns:
+                    找到的列名，如果都找不到则返回None
+                """
+                # 获取实际的列名列表
+                actual_columns = list(features.keys())
+                
+                # 检查首选列
+                if preferred_column in actual_columns:
+                    return preferred_column
+                
+                # 尝试备选列
+                for col in fallback_columns:
+                    if col in actual_columns:
+                        return col
+                
+                return None
+
+            def _parse_tools_field( tools_data: Any) -> Union[List[Dict], str, List]:
+                """
+                解析工具字段数据
+                
+                Args:
+                    tools_data: 工具数据（可能是字符串、列表、字典等）
+                    
+                Returns:
+                    解析后的工具数据
+                """
+                if tools_data is None:
+                    return []
+                
+                if isinstance(tools_data, str):
+                    # 如果是字符串，尝试解析为JSON
+                    try:
+                        if tools_data.strip():
+                            parsed = json.loads(tools_data)
+                            return parsed if isinstance(parsed, list) else [parsed]
+                        else:
+                            return []
+                    except (json.JSONDecodeError, ValueError):
+                        # 如果不是有效的JSON，返回原始字符串
+                        return tools_data.strip()
+                elif isinstance(tools_data, (list, dict)):
+                    # 如果是列表或字典，直接返回
+                    return tools_data if isinstance(tools_data, list) else [tools_data]
+                else:
+                    # 其他类型，转换为字符串
+                    return str(tools_data)
+    
+   
+            # 自动检测列名（如果提供的列名不存在）
+            input_column = _find_column(features, input_column, ["input", "question", "text", "prompt"])
+            expected_column = _find_column(features, expected_column, ["answer", "output", "target", "label"])
+            expected_tool_call_column = _find_column(features, expected_tool_call_column, 
+                                                         ["tool_calls", "expected_tools", "expected_tool_calls"])
+            available_tools_column = _find_column(features, available_tools_column, ["tools", "available_tools"])
+            context_column = _find_column(features, context_column, ["context", "passage", "document"])
+            
+            test_cases = []
+            
+            # 遍历数据集中的每个样本
+            for idx, sample in enumerate(self.hf_dataset):
+                test_case = {
+                    'id': sample[id_column] if id_column and id_column in sample else idx + 1,
+                    'input': str(sample.get(input_column, "")) if input_column in sample else "",
+                    'expected_output': str(sample.get(expected_column, "")) if expected_column and expected_column in sample else "",
+                }
+                
+                # 处理可用工具
+                if available_tools_column and available_tools_column in sample:
+                    available_tools = sample[available_tools_column]
+                    test_case['available_tools'] = _parse_tools_field(available_tools)
+                
+                # 处理预期工具调用
+                if expected_tool_call_column and expected_tool_call_column in sample:
+                    expected_tools = sample[expected_tool_call_column]
+                    test_case['expected_tools'] = _parse_tools_field(expected_tools)
+                
+                # 处理上下文
+                if context_column and context_column in sample:
+                    context = sample[context_column]
+                    test_case['context'] = str(context) if context is not None else ""
+                
+                # 添加其他字段
+                for key, value in sample.items():
+                    if key not in [input_column, expected_column, expected_tool_call_column, 
+                                 available_tools_column, context_column, id_column]:
+                        if key not in test_case:
+                            test_case[key] = str(value) if value is not None else ""
+                
+                test_cases.append(test_case)
+            
+            return test_cases
+            
+        except Exception as e:
+            raise Exception(f"加载Hugging Face数据集时发生错误: {str(e)}")
+    
 
 
 
 if __name__ == "__main__":
     
-    dataset = Dataset(name='test', description='test')
-    dataset.load(load_type='csv', csv_file='example_dataset/mcptask/testcase.csv', input_column='input', expected_column='expect_output', expected_tool_call_column='expected_tool_calls')
+    dataset = Dataset(name='bytedance-research/veAgentBench', description='test')
+    dataset.load(load_type='huggingface', split='test[:1]',config_name='financial_analysis', input_column='input', expected_column='expect_output', expected_tool_call_column='expected_tool_calls')
+    for test in dataset.get_testcase():
+        print(test)

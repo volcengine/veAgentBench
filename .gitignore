@@ -19,4 +19,10 @@ config.yaml
 .cache/*
 .tmp/*
 example_dataset/mcptask/testcase1.csv
-
+*.json
+build/*
+agent_test*.csv
+agent_test*.html
+analysis*.csv
+analysis*.html
+*.egg-info

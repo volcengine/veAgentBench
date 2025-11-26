@@ -12,49 +12,25 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-# 基础度量指标类
-from .base import BaseMetric
 
 # 自定义度量指标
 from .custom_metric import (
     CustomMetric,
-    CustomEvaluationResult,
-    CustomScoreReason,
-    CustomMetricTemplate,
 )
 
 # 答案正确性度量指标
 from .answer_correctness import (
     AnswerCorrectnessMetric,
-    StatementVerdict,
-    AnswerCorrectnessVerdicts,
-    AnswerCorrectnessScoreReason,
-    StatementGenerationOutput,
-    AnswerCorrectnessTemplate,
 )
 
 # MCP Bench 度量指标
 from .mcp_bench import (
     MCPToolMetric,
-    ToolCall,
-    MCPToolEvaluationResult,
-    MCPToolVerdicts,
-    MCPToolScoreReason,
-    ToolCallAnalysis,
-    MCPToolTemplate,
 )
 
 # 性能度量指标
 from .performance_metric import (
     PerformanceMetric,
-)
-
-# 从 deepeval 合并的度量指标
-from veagentbench.evals.deepeval.metrics.base_metric import (
-    BaseMetric as DeepEvalBaseMetric,
-    BaseConversationalMetric,
-    BaseMultimodalMetric,
-    BaseArenaMetric,
 )
 
 from veagentbench.evals.deepeval.metrics.dag.dag import DAGMetric, DeepAcyclicGraph
@@ -103,31 +79,11 @@ from veagentbench.evals.deepeval.metrics.multimodal_metrics import (
 )
 
 __all__ = [
-    # 基础类
-    "BaseMetric",
-    "DeepEvalBaseMetric",
-    "BaseConversationalMetric",
-    "BaseMultimodalMetric",
-    "BaseArenaMetric",
-    
+
     # VeAgentBench 自定义度量指标
     "CustomMetric",
-    "CustomEvaluationResult",
-    "CustomScoreReason",
-    "CustomMetricTemplate",
     "AnswerCorrectnessMetric",
-    "StatementVerdict",
-    "AnswerCorrectnessVerdicts",
-    "AnswerCorrectnessScoreReason",
-    "StatementGenerationOutput",
-    "AnswerCorrectnessTemplate",
     "MCPToolMetric",
-    "ToolCall",
-    "MCPToolEvaluationResult",
-    "MCPToolVerdicts",
-    "MCPToolScoreReason",
-    "ToolCallAnalysis",
-    "MCPToolTemplate",
     "PerformanceMetric",
 
     

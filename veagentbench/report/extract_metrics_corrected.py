@@ -640,7 +640,7 @@ def process_single_task(task_name: str, task_data: Dict[str, List[Dict[str, Any]
                 print(f"   🔧 Expected tool calls: {preview}")
     
     # 为每个任务生成独立的输出文件名
-    task_output_prefix = f"{output_prefix}_{task_name}"
+    task_output_prefix = f"{output_prefix}/{task_name}"
     
     # 保存结果
     save_to_formats(all_task_cases, summary, task_output_prefix, multi_dataset=multi_dataset)

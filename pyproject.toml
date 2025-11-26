@@ -61,6 +61,7 @@ dependencies = [
     "jinja2",
     "akshare>=1.17.63",
     "tos>=2.8.7",
+    "datasets>=4.4.1",
 ]
 
 [project.optional-dependencies]

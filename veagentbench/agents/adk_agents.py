@@ -77,7 +77,6 @@ class AdkAgent(BaseAgent):
             with requests.post(
                 self.end_point, data=json.dumps(DATA), headers=HEADERS, stream=stream
             ) as r:
-                is_sse = r.headers.get("Content-Type") == "text/event-stream"
                 for chunk in r.iter_lines():  
                     if not chunk:
                         continue
@@ -85,27 +84,12 @@ class AdkAgent(BaseAgent):
                         first_token_duration = (time.time() - time_start)
                     json_string = chunk.decode("utf-8").removeprefix("data: ").strip()
                     json_string = json.loads(json_string)
-                    try:
-                        # Handle different event formats
-                        if json_string.startswith("data: "):
-                            event_data = json.loads(json_string.removeprefix("data: "))
-                        else:
-                            event_data = json.loads(json_string)
-                    except json.JSONDecodeError as e:
-                        if not is_sse:
-                            # non-sse response and the response is not a valid json string, 
-                            # return the raw response string as the final response
-                            return AgentOutPut(
-                                first_token_duration = (time.time() - time_start),
-                                end2end_duration = (time.time() - time_start),
-                                final_response = json_string,
-                                tool_called = {},
-                                success = True
-                            )
-                        else:
-                            raise e
+                    # Handle different event formats
+                    if json_string.startswith("data: "):
+                        event_data = json.loads(json_string.removeprefix("data: "))
+                    else:
+                        event_data = json.loads(json_string)
 
-                    # print(f"Received event: {event_data}")
                     event = Event(**event_data)
 
                     calls = event.get_function_calls()
