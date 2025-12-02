@@ -32,7 +32,10 @@ from .mcp_bench import (
 from .performance_metric import (
     PerformanceMetric,
 )
-
+from .performance_metric._performance_metric_stream import (
+    PerformanceMetricStream,
+)
+from .tokens_metric._tokens_metric import TokensMetric
 from veagentbench.evals.deepeval.metrics.dag.dag import DAGMetric, DeepAcyclicGraph
 from veagentbench.evals.deepeval.metrics.conversational_dag.conversational_dag import ConversationalDAGMetric
 from veagentbench.evals.deepeval.metrics.bias.bias import BiasMetric
@@ -86,6 +89,8 @@ __all__ = [
     "MCPToolMetric",
     "PerformanceMetric",
 
+    "PerformanceMetricStream",
+    "TokensMetric",
     
     # DeepEval 核心度量指标
     "GEval",

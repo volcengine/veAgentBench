@@ -26,3 +26,4 @@ agent_test*.html
 analysis*.csv
 analysis*.html
 *.egg-info
+agent_test_reports*

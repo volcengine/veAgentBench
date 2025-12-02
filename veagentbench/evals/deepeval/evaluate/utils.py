@@ -410,6 +410,30 @@ def print_test_result(test_result: TestResult, display: TestRunResultDisplay):
             print(
                 f"  - ✅ {metric_data.name} (score: {metric_data.score}, threshold: {metric_data.threshold}, strict: {metric_data.strict_mode}, evaluation model: {metric_data.evaluation_model}, reason: {metric_data.reason}, error: {metric_data.error})"
             )
+            # 优雅地打印score_breakdown
+            if metric_data.score_breakdown:
+                print(f"    📊 Score Breakdown:")
+                if isinstance(metric_data.score_breakdown, dict):
+                    for key, value in metric_data.score_breakdown.items():
+                        if isinstance(value, (int, float)):
+                            print(f"      - {key}: {value:.3f}")
+                        else:
+                            print(f"      - {key}: {value}")
+                elif isinstance(metric_data.score_breakdown, list):
+                    for i, item in enumerate(metric_data.score_breakdown):
+                        if isinstance(item, dict):
+                            print(f"      {i+1}. ")
+                            for k, v in item.items():
+                                if isinstance(v, (int, float)):
+                                    print(f"         {k}: {v:.3f}")
+                                else:
+                                    print(f"         {k}: {v}")
+                        else:
+                            print(f"      {i+1}. {item}")
+                else:
+                    print(f"      {metric_data.score_breakdown}")
+            else:
+                print("    📊 Score Breakdown: None")
 
     # print("")
     # if test_result.multimodal:

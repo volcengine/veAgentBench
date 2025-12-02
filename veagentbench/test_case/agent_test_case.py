@@ -36,6 +36,7 @@ class ToolCallExpected(ToolCall):
     # description: Optional[str] = None
     server: str = "default"
 
+from veagentbench.evals.deepeval.test_case.conversational_test_case import Turn
 
 class AgentTestCase(LLMTestCase):
     """Agent测试用例类
@@ -49,6 +50,23 @@ class AgentTestCase(LLMTestCase):
     - 提供统一的测试用例接口
     - 支持Agent特有的评估需求
     """
+    success: bool = Field(
+        default=False,
+        serialization_alias="success",
+        validation_alias=AliasChoices("success", "success"),
+    )
+    input_list: List[str] = Field(
+        default=[],
+        serialization_alias="input_list",
+        validation_alias=AliasChoices("inputList", "input_list"),
+    )
+    
+    
+    turns: List[Turn] = Field(
+        default=[],
+        serialization_alias="turns",
+        validation_alias=AliasChoices("turns", "turns"),
+    )
     
     available_tools: Optional[Dict[str, ToolCall]] = Field(
         default=None,
@@ -78,7 +96,30 @@ class AgentTestCase(LLMTestCase):
         serialization_alias="total_round",
         validation_alias=AliasChoices("totalRound", "total_round"),
     )
+    trace_data: Optional[List[List[Dict[str, Any]]]] = Field(
+        default= [],
+        serialization_alias="trace_data",
+        validation_alias=AliasChoices("traceData", "trace_data"),
+    )
+    
+    time_to_first_token: Optional[List[float]] = Field(
+        default=[],
+        serialization_alias="time_to_first_token",
+        validation_alias=AliasChoices("time_to_first_token", "time_to_first_token"),
+    )
+    time_to_compeletion: Optional[List[float]] = Field(
+        default=[],
+        serialization_alias="time_to_compeletion",
+        validation_alias=AliasChoices("time_to_compeletion", "time_to_compeletion"),
+    )
     
     @model_validator(mode="before")
     def validate_input(cls, data):
         return data
+
+
+
+
+# class BFCLMultiTurnTestCaseParams(LLMTestCaseParams):
+#     """BFCL多轮测试用例参数类"""
+#     expected_cmds: Optional[List[ToolCallExpected]] = Field()

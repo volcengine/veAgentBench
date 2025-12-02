@@ -1,0 +1,26 @@
+tasks:
+- name: multiturn_test_init
+  enable_cache: true
+  datasets:
+  - name: multiturn_test_dataset
+    description: multiturn_test测试数据集
+    property:
+      type: csv
+      csv_file_path: "samples/multiturn_test/test_multi_turn.csv"
+      input_column: input
+      mulit_turn_input_column: input_list
+      expected_output_column: expect_output
+      expected_tool_call_column: expected_tool_calls
+      
+  metrics: ["PerformanceMetricStream", "TokensMetric"]
+  judge_model:
+    model_name: gpt-4
+    base_url: https://api.openai.com/v1
+    api_key: your_judge_api_key_here
+  agent:
+    type: LocalAdkAgent
+    property:
+      agent_name: bfcl_multiturn_agent
+      agent_dir_path: "agents/bfcl2"
+  max_concurrent: 5
+  cache_dir: ./cache
