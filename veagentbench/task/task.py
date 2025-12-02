@@ -107,6 +107,7 @@ class AgentTask(BaseTask):
                     available_tools_dict[tool.name] = tool
                 agent_testcase = AgentTestCase(
                     input=testcase.get("input", ''),
+                    name=testcase.get("name", ''),
                     input_list=testcase.get("input_list", ''),
                     expected_output=testcase.get("expected_output", ''),
                     expected_tools=[ToolCallExpected(
@@ -115,7 +116,8 @@ class AgentTask(BaseTask):
                         output=x.get('output', ''),
                         server=x.get('server', 'default'),
                     ) for x in testcase.get("expected_tools", [])],
-                    available_tools=available_tools_dict
+                    available_tools=available_tools_dict,
+                    extra_fields=testcase.get("extra_fields", {})
                 )
                 agent_testcases.append(agent_testcase)
             
@@ -312,13 +314,18 @@ class AgentTask(BaseTask):
         
         try:
             # 找到可用的执行方法，按优先级选择
-            fn = getattr(self.agent, 'generate_output')
 
             # testcase提供多轮输入时，逐轮执行
             if testcase.input_list:
-                for prompt in testcase.input_list:
+                fn = getattr(self.agent, 'generate_multiturn_output')
+                agent_response_list: List[AgentOutPut] = []
+                agent_response_list = await fn(
+                    prompts=testcase.input_list,
+                    user_id = self.user_id,
+                    **testcase.extra_fields)
+                for idx, result in enumerate(agent_response_list):
+                    prompt = testcase.input_list[idx]
                     self._add_turn_to_testcase(testcase=testcase, role='user', content=prompt)
-                    result = await self._generate_one_case(prompt, fn)
                     self._add_turn_to_testcase(testcase=testcase, role='assistant', agent_response=result)
                     testcase.trace_data.append(result.trace_data)
                     testcase.time_to_first_token.append(result.first_token_duration)
@@ -327,6 +334,8 @@ class AgentTask(BaseTask):
                 # 将结果写回用例，方便后续评估                    
                    
             else:
+                fn = getattr(self.agent, 'generate_output')
+
                 result = await self._generate_one_case(testcase.input, fn)
                 # 将结果写回用例，方便后续评估
                 

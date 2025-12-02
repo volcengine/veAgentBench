@@ -54,9 +54,9 @@ class ConfigGenerator:
         self.dataset_templates = {
             "csv": {
                 "type": "csv",
-                "csv_file_path": "path/to/your/dataset.csv",
+                "csv_file": "path/to/your/dataset.csv",
                 "input_column": "input",
-                "expected_output_column": "expect_output",
+                "expected_column": "expect_output",
                 "expected_tool_call_column": "expected_tool_calls"
             },
             "json": {

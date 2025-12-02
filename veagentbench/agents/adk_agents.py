@@ -43,11 +43,11 @@ class AdkAgent(BaseAgent):
         self,
         prompt: str,
         user_id: str,
+        session_id: str,
         stream: bool=True,
         **kwargs
     ):
         """Generate output with optional additional parameters from kwargs."""
-        session_id = self.get_session()
         
         # Handle additional parameters from kwargs
         custom_headers = kwargs.get('headers', {})

@@ -31,6 +31,9 @@ class AgentOutPut(BaseModel):
     success: Optional[bool] = Field(
         default = False
     )
+    trace_data: Optional[List[Dict[str, Any]]] = Field(
+        default = []
+    )
         
 
 class BaseAgent(ABC):
@@ -137,4 +140,3 @@ class TestAgent:
             return TestResut(success=True, response=response, trace_file_path="", trace_data=trace_data)
         except Exception as e:
             return TestResut(success=False, response=str(e), trace_file_path="")
-
