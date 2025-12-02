@@ -35,6 +35,8 @@ from .performance_metric import (
 from .performance_metric._performance_metric_stream import (
     PerformanceMetricStream,
 )
+from .bfcl_multiturn._bfcl_multiturn import BFCLMultiTurnMetric
+
 from .tokens_metric._tokens_metric import TokensMetric
 from veagentbench.evals.deepeval.metrics.dag.dag import DAGMetric, DeepAcyclicGraph
 from veagentbench.evals.deepeval.metrics.conversational_dag.conversational_dag import ConversationalDAGMetric
@@ -91,6 +93,7 @@ __all__ = [
 
     "PerformanceMetricStream",
     "TokensMetric",
+    "BFCLMultiTurnMetric",
     
     # DeepEval 核心度量指标
     "GEval",

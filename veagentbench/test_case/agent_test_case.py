@@ -50,6 +50,8 @@ class AgentTestCase(LLMTestCase):
     - 提供统一的测试用例接口
     - 支持Agent特有的评估需求
     """
+    extra_fields: Dict[str, Any] = {}
+    
     success: bool = Field(
         default=False,
         serialization_alias="success",

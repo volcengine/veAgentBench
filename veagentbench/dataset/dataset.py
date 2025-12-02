@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any, Union
 from datasets import load_dataset, DatasetDict
+import traceback
 
 class Dataset():
     """
@@ -59,6 +60,8 @@ class Dataset():
         self,
         csv_file: str,
         avalible_tools_column: str="avalible_tools",
+        case_name_column: Optional[str]="id",
+        extra_fields: List[str]=[],
         input_column: str='input',
         mulit_turn_input_column: str='input_list',
         expected_column: Optional[str]='expected_output',
@@ -75,7 +78,8 @@ class Dataset():
                 "expected_output":
             }
             '''
-        )
+        ),
+        **kwargs
     ):
         """
         从CSV文件加载数据集
@@ -145,8 +149,19 @@ class Dataset():
                 test_case = {
                     'id': index + 1,
                     'input': str(row[input_column]) if pd.notna(row[input_column]) else '',
-                    'expected_output': str(row[expected_column]) if pd.notna(row[expected_column]) else '',
+                    'expected_output': str(row[expected_column]) if pd.notna(row[expected_column]) else ''
                 }
+                # 遍历extra_columns，添加到test_case中
+                if extra_fields:
+                    test_case['extra_fields'] = {}
+                    for extra_col in extra_fields:
+                        if extra_col in df.columns and pd.notna(row[extra_col]):
+                            test_case['extra_fields'][extra_col] = str(row[extra_col])
+                
+                if case_name_column and case_name_column in df.columns and pd.notna(row[case_name_column]):
+                    test_case['name'] = str(row[case_name_column])
+                
+                
                 #如果多轮对话输入不为空
                 if mulit_turn_input_column and mulit_turn_input_column in df.columns and pd.notna(row[mulit_turn_input_column]):
                     mulit_turn_input = str(row[mulit_turn_input_column])
@@ -211,6 +226,7 @@ class Dataset():
         except FileNotFoundError:
             raise FileNotFoundError(f"CSV文件 '{csv_file}' 不存在")
         except Exception as e:
+            traceback.print_exc()
             raise Exception(f"读取CSV文件时发生错误: {str(e)}")
 
     @abstractmethod

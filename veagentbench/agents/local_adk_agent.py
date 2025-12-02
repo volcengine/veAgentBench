@@ -2,14 +2,26 @@ from veagentbench.agents.base_agent import BaseAgent, AgentOutPut
 from veadk.utils.logger import get_logger
 from veagentbench.utils.tool_result_success import is_tool_execution_success
 from pydantic import BaseModel
+from veadk.tracing.telemetry.exporters.apmplus_exporter import APMPlusExporter
+from veadk.tracing.telemetry.opentelemetry_tracer import OpentelemetryTracer
+from veagentbench.agents.tracer import VeOpentelemetryTracer
+import traceback
+import asyncio
+import time
+from typing import List, Optional, Dict, Any, Union
 logger = get_logger(__name__)
+
+
+    
+
+
 
 class LocalAdkAgent(BaseAgent):
     """
     本地ADK Agent，基于给定的目录中的agent对象，通过runner实现generate_output函数
     """
     
-    def __init__(self, agent_dir_path: str, agent_name: str = "local_adk_agent"):
+    def __init__(self, agent_dir_path: str, agent_name: str = "local_adk_agent", trace_folder: str="trace", stream: bool=True):
         """
         初始化本地ADK Agent
         
@@ -21,7 +33,12 @@ class LocalAdkAgent(BaseAgent):
         self.agent_name = agent_name
         self.agent = None
         self.runner = None
+        self.trace_dir = trace_folder
+        self.exporters = [APMPlusExporter()]
+        self.tracer = VeOpentelemetryTracer(trace_folder=self.trace_dir)
+        self.stream = stream
         self._load_agent_from_directory()
+
         
     def _load_agent_from_directory(self):
         """从目录中加载agent对象"""
@@ -29,7 +46,6 @@ class LocalAdkAgent(BaseAgent):
         import sys
         from pathlib import Path
         import os
-        
         try:
             # 将目录添加到sys.path
             if str(self.agent_dir_path) not in sys.path:
@@ -66,7 +82,9 @@ class LocalAdkAgent(BaseAgent):
                         break
                         
                 except Exception as e:
+                    traceback.print_exc()
                     logger.warning(f"加载文件 {py_file} 失败: {e}")
+                    
                     continue
             
             if self.agent is None:
@@ -76,6 +94,7 @@ class LocalAdkAgent(BaseAgent):
             
             # 创建runner
             from veadk import Runner
+            self.agent.tracers.append(self.tracer)
             self.runner = Runner(agent=self.agent, app_name=self.agent_name)
             logger.info("成功创建runner")
             
@@ -88,27 +107,60 @@ class LocalAdkAgent(BaseAgent):
         from uuid import uuid4
         return str(uuid4())
     
+    
+    
+    async def generate_multiturn_output(
+        self,
+        prompts: List[str],
+        user_id: str,
+        **kwargs
+    ) -> List[AgentOutPut]:
+        """通过runner生成多轮输出"""
+        session_id = self.get_session()
+        responses = []
+        for prompt in prompts:
+            output = await self.generate_output(
+                prompt=prompt,
+                user_id=user_id,
+                session_id=session_id,
+                **kwargs
+            )
+            responses.append(output)
+        return responses
+    
     async def generate_output(
         self,
         prompt: str,
         user_id: str,
-        stream: bool = False,
+        session_id: str, 
         **kwargs
     ) -> AgentOutPut:
         """通过runner生成输出，使用流式处理"""
         
-        session_id = self.get_session()
         tool_called = {}
         final_response = ""
         first_token_duration = 0.0
         end2end_duration = 0.0
+        time_start = time.time()
+
         
-        import time
+        if not self.stream:
+            response = await self.runner.run(messages=prompt, session_id=session_id, save_tracing_data=True)
+            end2end_duration = time.time() - time_start
+            trace_data = self.tracer.get_spans(session_id=session_id)
+            return AgentOutPut(
+                first_token_duration=first_token_duration,
+                end2end_duration=end2end_duration,
+                tool_called=tool_called,     #待补充完整解析
+                final_response=response,
+                success=True,
+                trace_data=trace_data
+            )
+        
         from google.genai.types import Content, Part
         from google.adk.agents import RunConfig
         from google.adk.agents.run_config import StreamingMode
         
-        time_start = time.time()
         
         try:
             # 获取会话服务
@@ -185,7 +237,8 @@ class LocalAdkAgent(BaseAgent):
                         final_response = str(response_data)
                     else:
                         final_response = full_response_text
-            
+            self.runner.save_tracing_file(session_id)
+            trace_data = self.tracer.get_spans(session_id=session_id)            
             logger.info(f"Agent执行完成，响应长度: {len(final_response)} 字符")
             
             return AgentOutPut(
@@ -193,7 +246,8 @@ class LocalAdkAgent(BaseAgent):
                 end2end_duration=end2end_duration,
                 tool_called=tool_called,
                 final_response=final_response,
-                success=True
+                success=True,
+                trace_data=trace_data
             )
             
         except Exception as e:
@@ -209,3 +263,67 @@ class LocalAdkAgent(BaseAgent):
                 success=False
             )
 
+
+
+
+class BfclAgent(LocalAdkAgent):
+    
+    def __init__(self, agent_dir_path, agent_name = "bfcl_agent", trace_folder = "trace", stream = True):
+        super().__init__(agent_dir_path, agent_name, trace_folder, stream)
+        from bfcl_mcp_server_config import BFCL_SERVERS
+        from veagentbench.utils.mcp_client import HttpStreambleMCPClient
+        self.bfcl_mcp_servers: Dict[str, HttpStreambleMCPClient] = {}
+        self.bfcl_server_configs = BFCL_SERVERS  # 存储配置供后续使用
+    
+    async def _ensure_mcp_client_connected(self, server_name: str) -> bool:
+        """确保MCP客户端已连接"""
+        if server_name not in self.bfcl_mcp_servers:
+            # 创建新的客户端
+            config = self.bfcl_server_configs[server_name]
+            from veagentbench.utils.mcp_client import interactive_standard_cloud_client
+            client = await interactive_standard_cloud_client(
+                endpoint_url=config['endpoint'], 
+                api_key=config['api_key']
+            )
+            if client:
+                self.bfcl_mcp_servers[server_name] = client
+                return True
+            else:
+                return False
+        
+        # 检查现有客户端的连接状态
+        client = self.bfcl_mcp_servers[server_name]
+        if not client.session or not client.read_stream or not client.write_stream:
+            # 重新连接
+            await client.disconnect()
+            connected = await client.connect()
+            return connected
+        
+        return True
+    
+    async def init_testcase(self, involved_classes: List[str], initial_config: Dict[str, Any]):
+        from veagentbench.metrics.bfcl_multiturn.multi_turn_eval.constant import STATELESS_CLASSES
+        for class_name in involved_classes:
+            # 确保客户端已连接
+            connected = await self._ensure_mcp_client_connected(class_name)
+            if not connected:
+                print(f"警告: 无法连接到 {class_name} 的MCP服务器")
+                continue
+            
+            mcp_client = self.bfcl_mcp_servers[class_name]
+            
+            if class_name not in STATELESS_CLASSES:
+                class_initial_config = initial_config.get(class_name, {})
+                # Deep copy the initial configuration to avoid mutation issues
+                res = await mcp_client.call_tool('load_scenario', {'scenario': class_initial_config, 'long_context': False})
+                
+            
+    
+    async def generate_multiturn_output(self, prompts, user_id, **kwargs)-> List[AgentOutPut]:
+        
+        initial_config = eval(kwargs.get('initial_config'))
+        involved_classes = eval(kwargs.get('involved_classes'))
+        
+        await self.init_testcase(involved_classes, initial_config)
+        result = await super().generate_multiturn_output(prompts, user_id, **kwargs)
+        return result

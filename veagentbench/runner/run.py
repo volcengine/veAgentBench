@@ -91,10 +91,7 @@ class AgentTestRunner:
         if load_type == 'csv':
             dataset.load(
                 load_type='csv',
-                csv_file=property_config.get('csv_file_path', ''),
-                input_column=property_config.get('input_column', 'input'),
-                expected_column=property_config.get('expected_output_column', 'expected_output'),
-                expected_tool_call_column=property_config.get('expected_tool_call_column', 'expected_tool_calls')
+                **property_config
             )
         elif load_type == 'huggingface':
             dataset.load(
