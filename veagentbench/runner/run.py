@@ -193,7 +193,7 @@ class AgentTestRunner:
                 
                 # 创建任务
                 task = AgentTask(
-                    enable_cache=task_config.get('enable_cache', True),
+                    enable_cache=task_config.get('enable_cache', False),
                     task_name=task_config.get('name', 'unknown_task'),
                     metrics=metrics,
                     datasets=datasets,

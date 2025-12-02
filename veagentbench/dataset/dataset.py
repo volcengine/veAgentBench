@@ -60,6 +60,7 @@ class Dataset():
         csv_file: str,
         avalible_tools_column: str="avalible_tools",
         input_column: str='input',
+        mulit_turn_input_column: str='input_list',
         expected_column: Optional[str]='expected_output',
         context_retrieved_column: Optional[str]='context_retrieved_column',
         expected_tool_call_column: Optional[str] = Field(
@@ -111,6 +112,9 @@ class Dataset():
                     else:
                         raise ValueError(f"输入列 '{input_column}' 不存在于CSV文件中")
             
+            
+            
+            
             # 如果预期列不存在，尝试使用常见的预期列名
             if expected_column not in df.columns:
                 possible_expected_cols = ['expect', 'Expect', 'EXPECTED', 'expected', 'expectation', 'Expectation']
@@ -143,6 +147,21 @@ class Dataset():
                     'input': str(row[input_column]) if pd.notna(row[input_column]) else '',
                     'expected_output': str(row[expected_column]) if pd.notna(row[expected_column]) else '',
                 }
+                #如果多轮对话输入不为空
+                if mulit_turn_input_column and mulit_turn_input_column in df.columns and pd.notna(row[mulit_turn_input_column]):
+                    mulit_turn_input = str(row[mulit_turn_input_column])
+                    try:
+                        # 尝试解析为JSON格式
+                        if mulit_turn_input.strip():
+                            mulit_turn_input = json.loads(mulit_turn_input)
+                            test_case['input_list'] = [x[0]['content'] for x in mulit_turn_input]
+                        else:
+                            test_case['input_list'] = []
+                    except (json.JSONDecodeError, ValueError):
+                        # 如果不是有效的JSON，则作为字符串处理
+                        test_case['input_list'] = mulit_turn_input.strip()
+                else:
+                    test_case['input_list'] = []
                 
                 #如果期望的调用工具存在且不为空
                 if avalible_tools_column and avalible_tools_column in df.columns and pd.notna(row[avalible_tools_column]):
