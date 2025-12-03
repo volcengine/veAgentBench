@@ -6,19 +6,24 @@ tasks:
     description: multiturn_test测试数据集
     property:
       type: csv
-      csv_file_path: "samples/multiturn_test/test_multi_turn.csv"
+      csv_file: "samples/multiturn_test/test_multi_turn.csv"
       input_column: input
+      case_name_column: id
       mulit_turn_input_column: input_list
-      expected_output_column: expect_output
+      expected_column: label_ground_truth
       expected_tool_call_column: expected_tool_calls
+      initial_config: initial_config
+      involved_classes: involved_classes
+      extra_fields: ["initial_config", "involved_classes"]
       
-  metrics: ["PerformanceMetricStream", "TokensMetric"]
+  metrics: ["BFCLMultiTurnMetric",    "PerformanceMetricStream",
+    "TokensMetric",]
   judge_model:
     model_name: gpt-4
     base_url: https://api.openai.com/v1
     api_key: your_judge_api_key_here
   agent:
-    type: LocalAdkAgent
+    type: BfclAgent
     property:
       agent_name: bfcl_multiturn_agent
       agent_dir_path: "agents/bfcl2"
