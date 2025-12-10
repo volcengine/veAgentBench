@@ -41,7 +41,7 @@ Comes with evaluation data for legal, education, financial analysis, and persona
 ### Installation
 
 ```bash
-pip install git+https://code.byted.org/iaas/veAgentBench.git
+pip install git+https://github.com/volcengine/veAgentBench.git
 ```
 
 ### Command Line Usage Guide
@@ -94,7 +94,7 @@ tasks:
         property:                               # Dataset-related properties
           type: huggingface                     # Dataset type, supports csv, huggingface
           config_name: legal_aid   
-          split: "test[:1]"        
+          split: "test[:1]"      
           input_column: "input"
           expected_output_column: "expect_output"
     metrics:                                    # Evaluation metrics
