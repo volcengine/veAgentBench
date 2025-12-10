@@ -87,7 +87,8 @@ class ContextualRelevancyMetric(BaseMetric):
                 )
 
             return self.score
-
+        
+    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
     async def a_measure(
         self,
         test_case: LLMTestCase,
@@ -214,7 +215,6 @@ class ContextualRelevancyMetric(BaseMetric):
         score = relevant_statements / total_verdicts
         return 0 if self.strict_mode and score < self.threshold else score
     
-    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
     async def _a_generate_verdicts(
         self, input: str, context: List[str]
     ) -> ContextualRelevancyVerdicts:

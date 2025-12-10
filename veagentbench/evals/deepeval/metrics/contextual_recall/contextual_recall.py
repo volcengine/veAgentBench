@@ -16,6 +16,7 @@ from veagentbench.evals.deepeval.models import DeepEvalBaseLLM
 from veagentbench.evals.deepeval.metrics.contextual_recall.template import ContextualRecallTemplate
 from veagentbench.evals.deepeval.metrics.indicator import metric_progress_indicator
 from veagentbench.evals.deepeval.metrics.contextual_recall.schema import *
+from veagentbench.evals.deepeval.metrics.faithfulness.faithfulness import retry
 
 
 class ContextualRecallMetric(BaseMetric):
@@ -87,7 +88,8 @@ class ContextualRecallMetric(BaseMetric):
                 )
 
             return self.score
-
+        
+    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
     async def a_measure(
         self,
         test_case: LLMTestCase,

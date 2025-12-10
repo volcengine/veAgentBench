@@ -39,7 +39,7 @@
 ### 安装
 
 ```bash
-pip install git+https://code.byted.org/iaas/veAgentBench.git
+pip install git+https://github.com/volcengine/veAgentBench.git
 ```
 
 ### 命令行使用指南
@@ -92,7 +92,7 @@ tasks:
         property:                               # 测试集相关属性
           type: huggingface                     # 测试集类型，支持csv、huggingface
           config_name: legal_aid   
-          split: "test[:1]"          
+          split: "test[:1]"        
           input_column: "input"
           expected_output_column: "expect_output"
     metrics:                                    # 评测指标
