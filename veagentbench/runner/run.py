@@ -88,9 +88,9 @@ class AgentTestRunner:
         property_config = dataset_config.get('property', {})
         load_type = property_config.get('type', 'csv')
         
-        if load_type == 'csv':
+        if load_type in ['csv', 'jsonl']:
             dataset.load(
-                load_type='csv',
+                load_type=load_type,
                 **property_config
             )
         elif load_type == 'huggingface':
@@ -98,9 +98,9 @@ class AgentTestRunner:
                 load_type='huggingface',
                 config_name=property_config.get('config_name', ''),
                 split=property_config.get('split', 'test'),
-                input_key=property_config.get('input_key', 'input'),
-                expected_key=property_config.get('expected_key', 'expected_output'),
-                expected_tool_call_key=property_config.get('expected_tool_call_key', 'expected_tool_calls')
+                input_column=property_config.get('input_column', 'input_column'),
+                expected_column=property_config.get('expected_column', 'expected_column'),
+                expected_tool_call_column=property_config.get('expected_tool_call_column', 'expected_tool_call_column')
             )
         else:
             raise ValueError(f"不支持的数据集类型: {load_type}")
