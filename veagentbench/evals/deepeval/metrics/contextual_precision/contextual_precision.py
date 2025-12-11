@@ -91,7 +91,7 @@ class ContextualPrecisionMetric(BaseMetric):
                 )
 
             return self.score
-    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
+        
     async def a_measure(
         self,
         test_case: LLMTestCase,
@@ -127,7 +127,8 @@ class ContextualPrecisionMetric(BaseMetric):
             )
 
             return self.score
-
+        
+    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
     async def _a_generate_reason(self, input: str):
         if self.include_reason is False:
             return None
@@ -191,7 +192,8 @@ class ContextualPrecisionMetric(BaseMetric):
                 res = self.model.generate(prompt)
                 data = trimAndLoadJson(res, self)
                 return data["reason"]
-
+            
+    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
     async def _a_generate_verdicts(
         self, input: str, expected_output: str, retrieval_context: List[str]
     ) -> List[ContextualPrecisionVerdict]:
