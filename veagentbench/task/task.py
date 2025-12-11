@@ -95,6 +95,7 @@ class AgentTask(BaseTask):
             # 创建所有agent测试用例
             agent_testcases = []
             for testcase in testcases:
+                # logger.debug(f"处理测试用例: {testcase}")
                 available_tools=[
                     ToolCall(
                         name=x.get('name', ''),
@@ -108,7 +109,7 @@ class AgentTask(BaseTask):
                 agent_testcase = AgentTestCase(
                     input=testcase.get("input", ''),
                     name=testcase.get("name", ''),
-                    input_list=testcase.get("input_list", ''),
+                    input_list=testcase.get("input_list", []),
                     expected_output=testcase.get("expected_output", ''),
                     expected_tools=[ToolCallExpected(
                         name=x.get('name', ''),
@@ -220,13 +221,13 @@ class AgentTask(BaseTask):
             max_concurrent = self.max_concurrent
         return asyncio.run(self.generate_agent_response_async(max_concurrent=max_concurrent))
     
-    async def _generate_one_case(self, prompt:str, fn) -> AgentOutPut:
+    async def _generate_one_case(self, prompt:str, fn, testcase: AgentTestCase) -> AgentOutPut:
         '''
         _generate_one_case 的 Docstring
         '''
         result: AgentOutPut = None
         session_id = self.agent.get_session()
-        result = await fn(prompt=prompt, user_id = self.user_id, session_id= session_id)
+        result = await fn(prompt=prompt, user_id = self.user_id, session_id= session_id, **testcase.extra_fields)
 
         # 将结果写回用例，方便后续评估
         return result
@@ -305,7 +306,7 @@ class AgentTask(BaseTask):
                         
                         self._apply_cache_to_testcase(testcase, cache_data)
                         logger.info(f"测试用例缓存命中，跳过执行: {testcase.input[:50]}...")
-                    
+                        # logger.debug(f"缓存内容: {testcase.model_dump_json(indent=2)}") 
                         return testcase
                     else:
                         logger.warning(f"缓存结果中，agent执行状态失败，重新调用agent: {testcase.input[:50]}...")
@@ -336,7 +337,7 @@ class AgentTask(BaseTask):
             else:
                 fn = getattr(self.agent, 'generate_output')
 
-                result = await self._generate_one_case(testcase.input, fn)
+                result = await self._generate_one_case(testcase.input, fn, testcase=testcase)
                 # 将结果写回用例，方便后续评估
                 
                 self._write_result_to_testcase(result, testcase)
@@ -360,7 +361,7 @@ if __name__ == "__main__":
     dataset = dataset = Dataset(name='test', description='test')
     dataset.load(
         load_type='csv', 
-        csv_file='dataset/test_multi_turn.csv', 
+        file_path='dataset/test_multi_turn.csv', 
         input_column='input', 
         expected_column='expect_output', 
     )
