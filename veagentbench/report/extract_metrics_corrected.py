@@ -114,8 +114,8 @@ def extract_metrics_data_from_testcases(test_cases: List[Dict[str, Any]]):
             'case_id': i,
             'case_name': test_case.get('name', f'test_case_{i}'),
             'input': test_case.get('input', ''),
-            'actual_output': test_case.get('actualOutput', ''),
-            'expected_output': test_case.get('expectedOutput', ''),
+            'actual_output': test_case.get('actual_output', ''),
+            'expected_output': test_case.get('expected_output', ''),
             'success': test_case.get('success', False),
             'run_duration': test_case.get('runDuration', 0)
         }

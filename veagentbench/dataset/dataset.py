@@ -38,7 +38,7 @@ class Dataset():
         self,
         load_type: str = Field(
             default='csv',
-            examples = ['csv', 'trace_local', 'trace_cloud', 'huggingface'],
+            examples = ['csv', 'jsonl', 'trace_local', 'trace_cloud', 'huggingface'],
             description='数据载入类型'
         ),
         **kwargs
@@ -48,6 +48,8 @@ class Dataset():
         """
         if load_type == 'csv':
             self.testcases = self.from_csv(**kwargs)
+        elif load_type == 'jsonl':
+            self.testcases = self.from_jsonl_file(**kwargs)
         elif load_type == 'huggingface':
             self.testcases = self.from_huggingface(**kwargs)
             
@@ -58,7 +60,8 @@ class Dataset():
 
     def from_csv(
         self,
-        csv_file: str,
+        csv_file: str='',
+        file_path: str='',
         avalible_tools_column: str="avalible_tools",
         case_name_column: Optional[str]="id",
         extra_fields: List[str]=[],
@@ -95,7 +98,9 @@ class Dataset():
         """
         try:
             # 读取CSV文件
-            df = pd.read_csv(csv_file)
+            if csv_file:
+                file_path = csv_file
+            df = pd.read_csv(file_path)
             
             # 获取所有列名
             all_columns = df.columns.tolist()
@@ -398,7 +403,196 @@ class Dataset():
             raise Exception(f"加载Hugging Face数据集时发生错误: {str(e)}")
     
 
+    def from_jsonl_file(
+        self,
+        file_path: str,
+        avalible_tools_column: str="avalible_tools",
+        case_name_column: Optional[str]="id",
+        extra_fields: List[str]=[],
+        input_column: str='input',
+        mulit_turn_input_column: str='input_list',
+        expected_column: Optional[str]='expected_output',
+        context_retrieved_column: Optional[str]='context_retrieved_column',
+        expected_tool_call_column: Optional[str] = Field(
+            default='',
+            description='''
+            预期的工具调用；格式如下：
+            {
+                "tool_name":
+                "server_name":(默认defaul)
+                "discription":
+                "parameters":
+                "expected_output":
+            }
+            '''
+        ),
+        **kwargs
+    ):
+        """
+        从JSONL文件加载数据集
+        
+        Args:
+            jsonl_file: JSONL文件路径
+            input_column: 输入列名
+            expected_column: 预期结果列名
+            expected_tool_call_column: 预期工具调用列名（可选）
+            avalible_tools_column: 可用工具列名
+            case_name_column: 用例名称列名
+            extra_fields: 额外字段列表
+            mulit_turn_input_column: 多轮对话输入列名
+            context_retrieved_column: 上下文检索列名
+            
+        Returns:
+            List[Dict]: 包含测试用例的列表
+        """
+        try:
+            # 读取JSONL文件
+            test_cases = []
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:  # 跳过空行
+                        continue
+                    
+                    try:
+                        # 解析JSON行
+                        data = json.loads(line)
+                        
+                        # 如果输入列不存在，尝试使用常见的输入列名
+                        if input_column not in data:
+                            possible_input_cols = ['input', 'Input', 'INPUT', 'prompt', 'Prompt', 'PROMPT', 'question', 'Question', 'QUESTION']
+                            for col in possible_input_cols:
+                                if col in data:
+                                    input_column = col
+                                    break
+                            else:
+                                # 使用第一个可用的键作为输入
+                                if data:
+                                    input_column = list(data.keys())[0]
+                                else:
+                                    print(f"警告: 第{line_num}行数据为空，跳过")
+                                    continue
+                        
+                        # 如果预期列不存在，尝试使用常见的预期列名
+                        if expected_column and expected_column not in data:
+                            possible_expected_cols = ['answer', 'Answer', 'ANSWER', 'output', 'Output', 'OUTPUT', 'expected', 'Expected', 'EXPECTED', 'expect_output', 'target', 'Target', 'TARGET']
+                            for col in possible_expected_cols:
+                                if col in data:
+                                    expected_column = col
+                                    break
+                        
+                        test_case = {
+                            'id': data.get(case_name_column, line_num),
+                            'input': str(data.get(input_column, '')) if data.get(input_column) is not None else '',
+                            'expected_output': str(data.get(expected_column, '')) if expected_column and data.get(expected_column) is not None else ''
+                        }
+                        
+                        # 处理用例名称
+                        if case_name_column and case_name_column in data and data.get(case_name_column) is not None:
+                            test_case['name'] = str(data[case_name_column])
+                        
+                        # 处理额外字段
+                        if extra_fields:
+                            test_case['extra_fields'] = {}
+                            for extra_col in extra_fields:
+                                if extra_col in data and data.get(extra_col) is not None:
+                                    test_case['extra_fields'][extra_col] = str(data[extra_col])
+                        
+                        # 处理多轮对话输入
+                        if mulit_turn_input_column and mulit_turn_input_column in data and data.get(mulit_turn_input_column) is not None:
+                            mulit_turn_input = data[mulit_turn_input_column]
+                            if isinstance(mulit_turn_input, str):
+                                try:
+                                    # 尝试解析为JSON格式
+                                    if mulit_turn_input.strip():
+                                        mulit_turn_input = json.loads(mulit_turn_input)
+                                        test_case['input_list'] = [x[0]['content'] for x in mulit_turn_input] if isinstance(mulit_turn_input, list) else [mulit_turn_input]
+                                    else:
+                                        test_case['input_list'] = []
+                                except (json.JSONDecodeError, ValueError):
+                                    # 如果不是有效的JSON，则作为字符串处理
+                                    test_case['input_list'] = mulit_turn_input.strip()
+                            elif isinstance(mulit_turn_input, list):
+                                test_case['input_list'] = mulit_turn_input
+                            else:
+                                test_case['input_list'] = str(mulit_turn_input)
+                        else:
+                            test_case['input_list'] = []
+                        
+                        # 处理可用工具
+                        if avalible_tools_column and avalible_tools_column in data and data.get(avalible_tools_column) is not None:
+                            available_tools = data[avalible_tools_column]
+                            test_case['available_tools'] = self._parse_tools_field(available_tools)
+                        else:
+                            test_case['available_tools'] = []
+                        
+                        # 处理预期工具调用
+                        if expected_tool_call_column and expected_tool_call_column in data and data.get(expected_tool_call_column) is not None:
+                            tool_call_data = data[expected_tool_call_column]
+                            test_case['expected_tools'] = self._parse_tools_field(tool_call_data)
+                        else:
+                            test_case['expected_tools'] = []
+                        
+                        # 处理上下文检索
+                        if context_retrieved_column and context_retrieved_column in data and data.get(context_retrieved_column) is not None:
+                            test_case['context_retrieved'] = str(data[context_retrieved_column])
+                        
+                        # 添加其他未明确处理的字段
+                        for key, value in data.items():
+                            if key not in [input_column, expected_column, expected_tool_call_column, 
+                                         avalible_tools_column, case_name_column, mulit_turn_input_column,
+                                         context_retrieved_column] and key not in test_case:
+                                if value is not None:
+                                    test_case[key] = str(value)
+                        
+                        test_cases.append(test_case)
+                        
+                    except json.JSONDecodeError as e:
+                        print(f"警告: 第{line_num}行JSON解析失败: {e}")
+                        continue
+                    except Exception as e:
+                        print(f"警告: 处理第{line_num}行时发生错误: {e}")
+                        continue
+            
+            return test_cases
+            
+        except FileNotFoundError:
+            raise FileNotFoundError(f"JSONL文件 '{file_path}' 不存在")
+        except Exception as e:
+            traceback.print_exc()
+            raise Exception(f"读取JSONL文件时发生错误: {str(e)}")
 
+    def _parse_tools_field(self, tools_data: Any) -> Union[List[Dict], str, List]:
+        """
+        解析工具字段数据
+        
+        Args:
+            tools_data: 工具数据（可能是字符串、列表、字典等）
+            
+        Returns:
+            解析后的工具数据
+        """
+        if tools_data is None:
+            return []
+        
+        if isinstance(tools_data, str):
+            # 如果是字符串，尝试解析为JSON
+            try:
+                if tools_data.strip():
+                    parsed = json.loads(tools_data)
+                    return parsed if isinstance(parsed, list) else [parsed]
+                else:
+                    return []
+            except (json.JSONDecodeError, ValueError):
+                # 如果不是有效的JSON，返回原始字符串
+                return tools_data.strip()
+        elif isinstance(tools_data, (list, dict)):
+            # 如果是列表或字典，直接返回
+            return tools_data if isinstance(tools_data, list) else [tools_data]
+        else:
+            # 其他类型，转换为字符串
+            return str(tools_data)
 
 if __name__ == "__main__":
     

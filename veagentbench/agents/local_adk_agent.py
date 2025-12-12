@@ -222,7 +222,7 @@ class LocalAdkAgent(BaseAgent):
                     if not first_token_received:
                         first_token_duration = time.time() - time_start
                         first_token_received = True
-                    full_response_text += event.content.parts[0].text
+                    # full_response_text += event.content.parts[0].text
                 
                 # 处理最终响应
                 if event.is_final_response():
@@ -231,6 +231,8 @@ class LocalAdkAgent(BaseAgent):
                     if event.content and event.content.parts and event.content.parts[0].text:
                         # 如果是流的最后部分，使用累积的文本
                         final_response = full_response_text + (event.content.parts[0].text if not event.partial else "")
+                        full_response_text = "" # Reset accumulator
+
                     elif event.actions and event.actions.skip_summarization and event.get_function_responses():
                         # 处理原始工具结果的显示
                         response_data = event.get_function_responses()[0].response
@@ -327,3 +329,67 @@ class BfclAgent(LocalAdkAgent):
         await self.init_testcase(involved_classes, initial_config)
         result = await super().generate_multiturn_output(prompts, user_id, **kwargs)
         return result
+
+
+
+class LocomoAgent(LocalAdkAgent):
+    
+    def __init__(self, agent_dir_path, agent_name = "locomo_agent", trace_folder = "trace", stream = True):
+        super().__init__(agent_dir_path, agent_name, trace_folder, stream)
+        
+        
+    
+    
+    async def generate_output(
+        self,
+        prompt: str,
+        user_id: str,
+        session_id: str, 
+        **kwargs
+    ) -> AgentOutPut:
+        """通过runner生成输出，使用流式处理"""
+        def extract_user_id(question):
+            # 根据问题内容提取user_id
+            # 定义所有在QA问题中发现的用户
+            unique_users = {"Caroline", "Melanie", "Jon", "Gina", "Maria", "John", "Joanna", "Nate", "Tim", "Audrey", "Andrew",
+                            "James", "Deborah", "Jolene", "Evan", "Sam", "Calvin", "Dave"}
+
+            for user in unique_users:
+                if user in question:
+                    return user
+        idx = kwargs.get('idx', None)
+        user_id = extract_user_id(prompt) or user_id
+        
+        if idx is not None:
+            idx = int(idx)
+            user_id = f"{user_id}_{idx}"
+        return await super().generate_output(
+            prompt=prompt,
+            user_id=user_id,
+            session_id=session_id,
+            **kwargs
+        )
+        
+        
+class LongMemAgent(LocalAdkAgent):
+    
+    def __init__(self, agent_dir_path, agent_name = "long_mem_agent", trace_folder = "trace", stream = True):
+        super().__init__(agent_dir_path, agent_name, trace_folder, stream)
+        
+
+    async def generate_output(
+        self,
+        prompt: str,
+        user_id: str,
+        session_id: str, 
+        **kwargs
+    ) -> AgentOutPut:
+        """通过runner生成输出，使用流式处理"""
+        
+        user_id = kwargs.get("question_id")
+        return await super().generate_output(
+            prompt=prompt,
+            user_id=user_id,
+            session_id=session_id,
+            **kwargs
+        )
