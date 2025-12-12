@@ -38,6 +38,10 @@ from .performance_metric._performance_metric_stream import (
 from .bfcl_multiturn._bfcl_multiturn import BFCLMultiTurnMetric
 
 from .tokens_metric._tokens_metric import TokensMetric
+
+# Locomo 度量指标
+from .locomo import LocomoMetric,LocomoLLMMetric
+from .longmemeval import LongMemEvalMetric
 from veagentbench.evals.deepeval.metrics.dag.dag import DAGMetric, DeepAcyclicGraph
 from veagentbench.evals.deepeval.metrics.conversational_dag.conversational_dag import ConversationalDAGMetric
 from veagentbench.evals.deepeval.metrics.bias.bias import BiasMetric
@@ -90,10 +94,13 @@ __all__ = [
     "AnswerCorrectnessMetric",
     "MCPToolMetric",
     "PerformanceMetric",
+    "LocomoMetric",
 
     "PerformanceMetricStream",
     "TokensMetric",
     "BFCLMultiTurnMetric",
+    "LongMemEvalMetric",
+    "LocomoLLMMetric",
     
     # DeepEval 核心度量指标
     "GEval",

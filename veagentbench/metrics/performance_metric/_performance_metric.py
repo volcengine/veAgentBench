@@ -41,6 +41,8 @@ class PerformanceMetric(BaseMetric):
         threshold: float = 0.5,
         include_reason: bool = True,
         async_mode: bool = True,
+        model = None,
+        model_name = None,
         evaluation_template: Type[PerformanceTemplate] = PerformanceTemplate,
     ):
         self.threshold = threshold
@@ -108,10 +110,10 @@ class PerformanceMetric(BaseMetric):
             _show_indicator=_show_indicator,
             _in_component=_in_component,
         ):
-            self._compute_metrics(test_case)
+            await self._compute_metrics(test_case)
             return self.score
 
-    def _compute_metrics(self, test_case: Union[LLMTestCase, AgentTestCase]):
+    async def _compute_metrics(self, test_case: Union[LLMTestCase, AgentTestCase]):
         # 初始化基于trace_data的性能指标
         trace_performance_data = None
         end_to_end_duration = None
@@ -119,8 +121,9 @@ class PerformanceMetric(BaseMetric):
         llm_call_stats = None
         
         # 优先使用trace_data进行性能分析（如果存在）
-        trace_data = getattr(test_case, "trace_data", None)
-        if trace_data:
+        trace_data_list = getattr(test_case, "trace_data", None)
+        for trace_data in trace_data_list or []:
+        
             try:
                 # 解析trace_data（可能是JSON字符串）
                 if isinstance(trace_data, str):
@@ -129,7 +132,7 @@ class PerformanceMetric(BaseMetric):
                     trace_data_obj = trace_data
                 
                 # 使用前面实现的性能分析功能
-                trace_performance_data = extract_performance_data_from_trace(trace_data_obj)
+                trace_performance_data = await extract_performance_data_from_trace(trace_data_obj)
                 
                 # 提取关键性能指标
                 end_to_end_duration = trace_performance_data.get("end_to_end_duration")

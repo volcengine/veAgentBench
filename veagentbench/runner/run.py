@@ -129,7 +129,7 @@ class AgentTestRunner:
                     
                     # 根据指标类型创建实例
 
-                    metrics.append(metric_class(model=judge_model))
+                    metrics.append(metric_class(model=judge_model, model_name=judge_model_config.get('model_name', 'gpt-4')))
                     
                     logger.info(f"成功创建指标: {metric_name}")
                 else:

@@ -37,7 +37,8 @@ class TokensMetric(BaseMetric):
         self,
         threshold: float = 0.5,
         async_mode: bool = True,
-        model: Optional[Union[str, DeepEvalBaseLLM]] = None
+        model: Optional[Union[str, DeepEvalBaseLLM]] = None,
+        model_name = None
 
     ):
         self.threshold = threshold
@@ -103,10 +104,10 @@ class TokensMetric(BaseMetric):
             _show_indicator=_show_indicator,
             _in_component=_in_component,
         ):
-            self._compute_metrics(test_case)
+            await self.a_compute_metrics(test_case)
             return self.score
 
-    def _compute_metrics(self, test_case: Union[LLMTestCase, AgentTestCase]):
+    async def a_compute_metrics(self, test_case: Union[LLMTestCase, AgentTestCase]):
         # 初始化基于trace_data的性能指标
 
         trace_data_list = test_case.trace_data

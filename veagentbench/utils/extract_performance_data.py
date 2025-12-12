@@ -162,7 +162,7 @@ class PerformanceDataExtractor:
         
         return agent_durations
     
-    def extract_performance_summary(self) -> Dict[str, Any]:
+    async def extract_performance_summary(self) -> Dict[str, Any]:
         """提取完整的性能数据汇总"""
         summary = {
             'end_to_end_duration': self.extract_end_to_end_duration(),
@@ -471,11 +471,11 @@ def extract_performance_data_from_trace_file(file_path: str) -> Dict[str, Any]:
         }
 
 
-def extract_performance_data_from_trace(trace_data: Union[str, Dict, List]) -> Dict[str, Any]:
+async def extract_performance_data_from_trace(trace_data: Union[str, Dict, List]) -> Dict[str, Any]:
     """从trace数据中提取性能数据"""
     extractor = PerformanceDataExtractor()
     extractor.load_trace_data(trace_data)
-    return extractor.extract_performance_summary()
+    return await extractor.extract_performance_summary()
 
 
 # 使用示例
