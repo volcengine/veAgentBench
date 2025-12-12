@@ -114,9 +114,9 @@ class TokensMetric(BaseMetric):
         for trace_data in trace_data_list:
             for span in trace_data:
                 if span['name'] == 'call_llm':
-                    self.input_tokens += span['attributes']['gen_ai.usage.input_tokens']
-                    self.output_tokens += span['attributes']['gen_ai.usage.output_tokens']
-                    self.total_tokens += span['attributes']['gen_ai.usage.total_tokens']
+                    self.input_tokens += span['attributes'].get('gen_ai.usage.input_tokens', 0)
+                    self.output_tokens += span['attributes'].get('gen_ai.usage.output_tokens', 0)
+                    self.total_tokens += span['attributes'].get('gen_ai.usage.total_tokens', 0)
 
 
         self.score = 1
