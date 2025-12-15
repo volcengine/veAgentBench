@@ -32,7 +32,9 @@ def retry(
     max_attempts: int = 3,
     delay: float = 1.0,
     backoff: float = 2.0,
-    exceptions: tuple = (Exception,)
+    exceptions: tuple = (Exception,),
+    throw_exceptions: bool = True,
+    default_return: Optional[Any] = None
 ) -> Callable:
     """
     重试装饰器
@@ -42,6 +44,8 @@ def retry(
         delay: 初始延迟时间（秒）
         backoff: 延迟时间的增长因子
         exceptions: 需要重试的异常类型元组
+        throw_exceptions: 是否抛出异常，默认为True
+        default_return: 默认返回值，当抛出异常且throw_exceptions为False时返回
         
     Returns:
         装饰器函数
@@ -65,8 +69,10 @@ def retry(
                     else:
                         print(f"函数 {func.__name__} 执行失败 (尝试 {attempt + 1}/{max_attempts}): {e}")
                         print("已达到最大重试次数，不再重试")
-            
-            raise last_exception
+            if throw_exceptions:
+                raise last_exception
+            else:
+                return default_return
         
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs) -> Any:
