@@ -19,560 +19,72 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any, Union
 from datasets import load_dataset, DatasetDict
 import traceback
+from enum import Enum
+import logging
 
-class Dataset():
-    """
-    数据集基类，用于加载和管理不同类型的数据集
-    """
-    
+# 设置日志
+logger = logging.getLogger(__name__)
+
+class DataFormat(Enum):
+    """数据格式枚举"""
+    CSV = "csv"
+    JSONL = "jsonl"
+    HUGGINGFACE = "huggingface"
+    TRACE_LOCAL = "trace_local"
+    TRACE_CLOUD = "trace_cloud"
+
+class FieldMapping:
+    """字段映射配置"""
     def __init__(
         self,
-        name: str,
-        description: str
-    ):
-        self.name = name
-        self.description = description
-
-
-    def load(
-        self,
-        load_type: str = Field(
-            default='csv',
-            examples = ['csv', 'jsonl', 'trace_local', 'trace_cloud', 'huggingface'],
-            description='数据载入类型'
-        ),
-        **kwargs
-    ):
-        """
-        加载数据集的基本方法
-        """
-        if load_type == 'csv':
-            self.testcases = self.from_csv(**kwargs)
-        elif load_type == 'jsonl':
-            self.testcases = self.from_jsonl_file(**kwargs)
-        elif load_type == 'huggingface':
-            self.testcases = self.from_huggingface(**kwargs)
-            
-
-    def get_testcase(self):
-        for testcase in self.testcases:
-            yield testcase
-
-    def from_csv(
-        self,
-        csv_file: str='',
-        file_path: str='',
-        avalible_tools_column: str="avalible_tools",
-        case_name_column: Optional[str]="id",
-        extra_fields: List[str]=[],
-        input_column: str='input',
-        mulit_turn_input_column: str='input_list',
-        expected_column: Optional[str]='expected_output',
-        context_retrieved_column: Optional[str]='context_retrieved_column',
-        expected_tool_call_column: Optional[str] = Field(
-            default='',
-            description='''
-            预期的工具调用；格式如下：
-            {
-                "tool_name":
-                "server_name":(默认defaul)
-                "discription":
-                "parameters":
-                "expected_output":
-            }
-            '''
-        ),
-        **kwargs
-    ):
-        """
-        从CSV文件加载数据集
-        
-        Args:
-            csv_file: CSV文件路径
-            input_column: 输入列名
-            expected_column: 预期结果列名
-            expected_tool_call_column: 预期工具调用列名（可选）
-            
-        Returns:
-            List[Dict]: 包含测试用例的列表
-        """
-        try:
-            # 读取CSV文件
-            if csv_file:
-                file_path = csv_file
-            df = pd.read_csv(file_path)
-            
-            # 获取所有列名
-            all_columns = df.columns.tolist()
-            
-            # 如果输入列不存在，尝试使用第一个非索引列
-            if input_column not in df.columns:
-                # 尝试使用常见的输入列名
-                possible_input_cols = ['input', 'Input', 'INPUT', 'prompt', 'Prompt', 'PROMPT']
-                for col in possible_input_cols:
-                    if col in df.columns:
-                        input_column = col
-                        break
-                else:
-                    # 使用第一个非索引列
-                    non_index_cols = [col for col in df.columns if col not in ['index', 'Index', 'INDEX', '序号', 'id', 'ID']]
-                    if non_index_cols:
-                        input_column = non_index_cols[0]
-                    else:
-                        raise ValueError(f"输入列 '{input_column}' 不存在于CSV文件中")
-            
-            
-            
-            
-            # 如果预期列不存在，尝试使用常见的预期列名
-            if expected_column not in df.columns:
-                possible_expected_cols = ['expect', 'Expect', 'EXPECTED', 'expected', 'expectation', 'Expectation']
-                for col in possible_expected_cols:
-                    if col in df.columns:
-                        expected_column = col
-                        break
-                else:
-                    # 使用第二个非索引列
-                    non_index_cols = [col for col in df.columns if col not in ['index', 'Index', 'INDEX', '序号', 'id', 'ID']]
-                    if len(non_index_cols) > 1:
-                        expected_column = non_index_cols[1]
-                    else:
-                        raise ValueError(f"预期列 '{expected_column}' 不存在于CSV文件中")
-            
-            # 如果工具调用列存在但为空字符串，尝试使用常见的工具调用列名
-            if expected_tool_call_column == '' or expected_tool_call_column not in df.columns:
-                possible_tool_cols = ['expect_tools_calls', 'expected_tools_calls', 'tool_calls', 'ToolCalls']
-                for col in possible_tool_cols:
-                    if col in df.columns:
-                        expected_tool_call_column = col
-                        break
-            
-            test_cases = []
-            
-            # 遍历每一行数据
-            for index, row in df.iterrows():
-                test_case = {
-                    'id': index + 1,
-                    'input': str(row[input_column]) if pd.notna(row[input_column]) else '',
-                    'expected_output': str(row[expected_column]) if pd.notna(row[expected_column]) else ''
-                }
-                # 遍历extra_columns，添加到test_case中
-                if extra_fields:
-                    test_case['extra_fields'] = {}
-                    for extra_col in extra_fields:
-                        if extra_col in df.columns and pd.notna(row[extra_col]):
-                            test_case['extra_fields'][extra_col] = str(row[extra_col])
-                
-                if case_name_column and case_name_column in df.columns and pd.notna(row[case_name_column]):
-                    test_case['name'] = str(row[case_name_column])
-                
-                
-                #如果多轮对话输入不为空
-                if mulit_turn_input_column and mulit_turn_input_column in df.columns and pd.notna(row[mulit_turn_input_column]):
-                    mulit_turn_input = str(row[mulit_turn_input_column])
-                    try:
-                        # 尝试解析为JSON格式
-                        if mulit_turn_input.strip():
-                            mulit_turn_input = json.loads(mulit_turn_input)
-                            test_case['input_list'] = [x[0]['content'] for x in mulit_turn_input]
-                        else:
-                            test_case['input_list'] = []
-                    except (json.JSONDecodeError, ValueError):
-                        # 如果不是有效的JSON，则作为字符串处理
-                        test_case['input_list'] = mulit_turn_input.strip()
-                else:
-                    test_case['input_list'] = []
-                
-                #如果期望的调用工具存在且不为空
-                if avalible_tools_column and avalible_tools_column in df.columns and pd.notna(row[avalible_tools_column]):
-                    avalible_tools = str(row[avalible_tools_column])
-                    try:
-                        # 尝试解析为JSON格式
-                        if avalible_tools.strip():
-                            avalible_tools = json.loads(avalible_tools)
-                            test_case['available_tools'] = avalible_tools
-                        else:
-                            test_case['available_tools'] = []
-                    except (json.JSONDecodeError, ValueError):
-                        # 如果不是有效的JSON，则作为字符串处理
-                        test_case['available_tools'] = avalible_tools.strip()
-                else:
-                    test_case['expected_tools'] = []
-                
-                # 如果工具调用列存在且不为空
-                if expected_tool_call_column and expected_tool_call_column in df.columns and pd.notna(row[expected_tool_call_column]):
-                    tool_call_data = str(row[expected_tool_call_column])
-                    try:
-                        # 尝试解析为JSON格式
-                        if tool_call_data.strip():
-                            tool_calls = json.loads(tool_call_data)
-                            test_case['expected_tools'] = tool_calls
-                        else:
-                            test_case['expected_tools'] = []
-                    except (json.JSONDecodeError, ValueError):
-                        # 如果不是有效的JSON，则作为字符串处理
-                        test_case['expected_tools'] = tool_call_data.strip()
-                else:
-                    test_case['expected_tools'] = []
-                
-                # 添加其他可能的列
-                for col in df.columns:
-                    if col not in [input_column, expected_column, expected_tool_call_column]:
-                        col_value = row[col]
-                        if pd.notna(col_value):
-                            test_case[col] = str(col_value)
-                
-                test_cases.append(test_case)
-            
-
-            
-            return test_cases
-            
-        except FileNotFoundError:
-            raise FileNotFoundError(f"CSV文件 '{csv_file}' 不存在")
-        except Exception as e:
-            traceback.print_exc()
-            raise Exception(f"读取CSV文件时发生错误: {str(e)}")
-
-    @abstractmethod
-    def from_trace_local(self):
-        """
-        从本地trace文件加载数据集
-        """
-        pass
-
-    @abstractmethod
-    def from_cloud(self):
-        """
-        从云端加载数据集
-        """
-        pass
-
-    def from_huggingface(
-        self,
-        config_name: str,
-        split: str='test',
         input_column: str = "input",
-        expected_column: Optional[str] = "expect_output",
-        expected_tool_call_column: Optional[str] = "expected_tool_calls",
-        available_tools_column: Optional[str] = "available_tools",
-        context_column: Optional[str] = "context",
-        id_column: Optional[str] = None,
-        **load_kwargs
-    ) -> List[Dict[str, Any]]:
-        """
-        从Hugging Face数据集加载测试用例
-        
-        Args:
-            input_column: 输入列名
-            expected_column: 预期输出列名
-            expected_tool_call_column: 预期工具调用列名
-            available_tools_column: 可用工具列名
-            context_column: 上下文列名
-            id_column: ID列名（如果不提供，将使用索引）
-            **load_kwargs: 传递给load_dataset的其他参数
-            
-        Returns:
-            List[Dict]: 包含测试用例的列表
-        """
-        try:
-            # 从Hugging Face Hub加载数据集
-            if config_name:
-                dataset_dict = load_dataset(
-                    self.name, 
-                    config_name, 
-                    split=split,
-                )
-            else:
-                dataset_dict = load_dataset(
-                    self.name, 
-                    split=split,
-                )
-            
-            # 确保我们有一个Dataset对象
-            if isinstance(dataset_dict, DatasetDict):
-                self.hf_dataset = dataset_dict[split]
-            else:
-                self.hf_dataset = dataset_dict
-            
-            # 获取数据集的特征（列名）
-            features = self.hf_dataset.features
-            def _find_column( features, preferred_column: str, fallback_columns: List[str]) -> Optional[str]:
-                """
-                查找列名，如果首选列不存在，则尝试备选列
-                
-                Args:
-                    features: 数据集的特征
-                    preferred_column: 首选列名
-                    fallback_columns: 备选列名列表
-                    
-                Returns:
-                    找到的列名，如果都找不到则返回None
-                """
-                # 获取实际的列名列表
-                actual_columns = list(features.keys())
-                
-                # 检查首选列
-                if preferred_column in actual_columns:
-                    return preferred_column
-                
-                # 尝试备选列
-                for col in fallback_columns:
-                    if col in actual_columns:
-                        return col
-                
-                return None
-
-            def _parse_tools_field( tools_data: Any) -> Union[List[Dict], str, List]:
-                """
-                解析工具字段数据
-                
-                Args:
-                    tools_data: 工具数据（可能是字符串、列表、字典等）
-                    
-                Returns:
-                    解析后的工具数据
-                """
-                if tools_data is None:
-                    return []
-                
-                if isinstance(tools_data, str):
-                    # 如果是字符串，尝试解析为JSON
-                    try:
-                        if tools_data.strip():
-                            parsed = json.loads(tools_data)
-                            return parsed if isinstance(parsed, list) else [parsed]
-                        else:
-                            return []
-                    except (json.JSONDecodeError, ValueError):
-                        # 如果不是有效的JSON，返回原始字符串
-                        return tools_data.strip()
-                elif isinstance(tools_data, (list, dict)):
-                    # 如果是列表或字典，直接返回
-                    return tools_data if isinstance(tools_data, list) else [tools_data]
-                else:
-                    # 其他类型，转换为字符串
-                    return str(tools_data)
-    
-   
-            # 自动检测列名（如果提供的列名不存在）
-            input_column = _find_column(features, input_column, ["input", "question", "text", "prompt"])
-            expected_column = _find_column(features, expected_column, ["answer", "output", "target", "label"])
-            expected_tool_call_column = _find_column(features, expected_tool_call_column, 
-                                                         ["tool_calls", "expected_tools", "expected_tool_calls"])
-            available_tools_column = _find_column(features, available_tools_column, ["tools", "available_tools"])
-            context_column = _find_column(features, context_column, ["context", "passage", "document"])
-            
-            test_cases = []
-            
-            # 遍历数据集中的每个样本
-            for idx, sample in enumerate(self.hf_dataset):
-                test_case = {
-                    'id': sample[id_column] if id_column and id_column in sample else idx + 1,
-                    'input': str(sample.get(input_column, "")) if input_column in sample else "",
-                    'expected_output': str(sample.get(expected_column, "")) if expected_column and expected_column in sample else "",
-                }
-                
-                # 处理可用工具
-                if available_tools_column and available_tools_column in sample:
-                    available_tools = sample[available_tools_column]
-                    test_case['available_tools'] = _parse_tools_field(available_tools)
-                
-                # 处理预期工具调用
-                if expected_tool_call_column and expected_tool_call_column in sample:
-                    expected_tools = sample[expected_tool_call_column]
-                    test_case['expected_tools'] = _parse_tools_field(expected_tools)
-                
-                # 处理上下文
-                if context_column and context_column in sample:
-                    context = sample[context_column]
-                    test_case['context'] = str(context) if context is not None else ""
-                
-                # 添加其他字段
-                for key, value in sample.items():
-                    if key not in [input_column, expected_column, expected_tool_call_column, 
-                                 available_tools_column, context_column, id_column]:
-                        if key not in test_case:
-                            test_case[key] = str(value) if value is not None else ""
-                
-                test_cases.append(test_case)
-            
-            return test_cases
-            
-        except Exception as e:
-            raise Exception(f"加载Hugging Face数据集时发生错误: {str(e)}")
-    
-
-    def from_jsonl_file(
-        self,
-        file_path: str,
-        avalible_tools_column: str="avalible_tools",
-        case_name_column: Optional[str]="id",
-        extra_fields: List[str]=[],
-        input_column: str='input',
-        mulit_turn_input_column: str='input_list',
-        expected_column: Optional[str]='expected_output',
-        context_retrieved_column: Optional[str]='context_retrieved_column',
-        expected_tool_call_column: Optional[str] = Field(
-            default='',
-            description='''
-            预期的工具调用；格式如下：
-            {
-                "tool_name":
-                "server_name":(默认defaul)
-                "discription":
-                "parameters":
-                "expected_output":
-            }
-            '''
-        ),
+        expected_column: str = "expected_output",
+        expected_tool_call_column: str = "expected_tool_calls",
+        available_tools_column: str = "available_tools",
+        context_column: str = "context",
+        id_column: str = "id",
+        multi_turn_input_column: str = "input_list",
+        case_name_column: str = "name",
+        extra_fields: List[str] = None,
         **kwargs
     ):
-        """
-        从JSONL文件加载数据集
-        
-        Args:
-            jsonl_file: JSONL文件路径
-            input_column: 输入列名
-            expected_column: 预期结果列名
-            expected_tool_call_column: 预期工具调用列名（可选）
-            avalible_tools_column: 可用工具列名
-            case_name_column: 用例名称列名
-            extra_fields: 额外字段列表
-            mulit_turn_input_column: 多轮对话输入列名
-            context_retrieved_column: 上下文检索列名
-            
-        Returns:
-            List[Dict]: 包含测试用例的列表
-        """
-        try:
-            # 读取JSONL文件
-            test_cases = []
-            
-            with open(file_path, 'r', encoding='utf-8') as f:
-                for line_num, line in enumerate(f, 1):
-                    line = line.strip()
-                    if not line:  # 跳过空行
-                        continue
-                    
-                    try:
-                        # 解析JSON行
-                        data = json.loads(line)
-                        
-                        # 如果输入列不存在，尝试使用常见的输入列名
-                        if input_column not in data:
-                            possible_input_cols = ['input', 'Input', 'INPUT', 'prompt', 'Prompt', 'PROMPT', 'question', 'Question', 'QUESTION']
-                            for col in possible_input_cols:
-                                if col in data:
-                                    input_column = col
-                                    break
-                            else:
-                                # 使用第一个可用的键作为输入
-                                if data:
-                                    input_column = list(data.keys())[0]
-                                else:
-                                    print(f"警告: 第{line_num}行数据为空，跳过")
-                                    continue
-                        
-                        # 如果预期列不存在，尝试使用常见的预期列名
-                        if expected_column and expected_column not in data:
-                            possible_expected_cols = ['answer', 'Answer', 'ANSWER', 'output', 'Output', 'OUTPUT', 'expected', 'Expected', 'EXPECTED', 'expect_output', 'target', 'Target', 'TARGET']
-                            for col in possible_expected_cols:
-                                if col in data:
-                                    expected_column = col
-                                    break
-                        
-                        test_case = {
-                            'id': data.get(case_name_column, line_num),
-                            'input': str(data.get(input_column, '')) if data.get(input_column) is not None else '',
-                            'expected_output': str(data.get(expected_column, '')) if expected_column and data.get(expected_column) is not None else ''
-                        }
-                        
-                        # 处理用例名称
-                        if case_name_column and case_name_column in data and data.get(case_name_column) is not None:
-                            test_case['name'] = str(data[case_name_column])
-                        
-                        # 处理额外字段
-                        if extra_fields:
-                            test_case['extra_fields'] = {}
-                            for extra_col in extra_fields:
-                                if extra_col in data and data.get(extra_col) is not None:
-                                    test_case['extra_fields'][extra_col] = str(data[extra_col])
-                        
-                        # 处理多轮对话输入
-                        if mulit_turn_input_column and mulit_turn_input_column in data and data.get(mulit_turn_input_column) is not None:
-                            mulit_turn_input = data[mulit_turn_input_column]
-                            if isinstance(mulit_turn_input, str):
-                                try:
-                                    # 尝试解析为JSON格式
-                                    if mulit_turn_input.strip():
-                                        mulit_turn_input = json.loads(mulit_turn_input)
-                                        test_case['input_list'] = [x[0]['content'] for x in mulit_turn_input] if isinstance(mulit_turn_input, list) else [mulit_turn_input]
-                                    else:
-                                        test_case['input_list'] = []
-                                except (json.JSONDecodeError, ValueError):
-                                    # 如果不是有效的JSON，则作为字符串处理
-                                    test_case['input_list'] = mulit_turn_input.strip()
-                            elif isinstance(mulit_turn_input, list):
-                                test_case['input_list'] = mulit_turn_input
-                            else:
-                                test_case['input_list'] = str(mulit_turn_input)
-                        else:
-                            test_case['input_list'] = []
-                        
-                        # 处理可用工具
-                        if avalible_tools_column and avalible_tools_column in data and data.get(avalible_tools_column) is not None:
-                            available_tools = data[avalible_tools_column]
-                            test_case['available_tools'] = self._parse_tools_field(available_tools)
-                        else:
-                            test_case['available_tools'] = []
-                        
-                        # 处理预期工具调用
-                        if expected_tool_call_column and expected_tool_call_column in data and data.get(expected_tool_call_column) is not None:
-                            tool_call_data = data[expected_tool_call_column]
-                            test_case['expected_tools'] = self._parse_tools_field(tool_call_data)
-                        else:
-                            test_case['expected_tools'] = []
-                        
-                        # 处理上下文检索
-                        if context_retrieved_column and context_retrieved_column in data and data.get(context_retrieved_column) is not None:
-                            test_case['context_retrieved'] = str(data[context_retrieved_column])
-                        
-                        # 添加其他未明确处理的字段
-                        for key, value in data.items():
-                            if key not in [input_column, expected_column, expected_tool_call_column, 
-                                         avalible_tools_column, case_name_column, mulit_turn_input_column,
-                                         context_retrieved_column] and key not in test_case:
-                                if value is not None:
-                                    test_case[key] = str(value)
-                        
-                        test_cases.append(test_case)
-                        
-                    except json.JSONDecodeError as e:
-                        print(f"警告: 第{line_num}行JSON解析失败: {e}")
-                        continue
-                    except Exception as e:
-                        print(f"警告: 处理第{line_num}行时发生错误: {e}")
-                        continue
-            
-            return test_cases
-            
-        except FileNotFoundError:
-            raise FileNotFoundError(f"JSONL文件 '{file_path}' 不存在")
-        except Exception as e:
-            traceback.print_exc()
-            raise Exception(f"读取JSONL文件时发生错误: {str(e)}")
+        self.input_column = input_column
+        self.expected_column = expected_column
+        self.expected_tool_call_column = expected_tool_call_column
+        self.available_tools_column = available_tools_column
+        self.context_column = context_column
+        self.id_column = id_column
+        self.multi_turn_input_column = multi_turn_input_column
+        self.case_name_column = case_name_column
+        self.extra_fields = extra_fields or []
 
-    def _parse_tools_field(self, tools_data: Any) -> Union[List[Dict], str, List]:
-        """
-        解析工具字段数据
+class DataProcessor:
+    """统一数据处理器"""
+    
+    # 列名备选方案
+    INPUT_ALTERNATIVES = ['input', 'Input', 'INPUT', 'prompt', 'Prompt', 'PROMPT', 'question', 'Question', 'QUESTION']
+    EXPECTED_ALTERNATIVES = ['answer', 'Answer', 'ANSWER', 'output', 'Output', 'OUTPUT', 'expected', 'Expected', 'EXPECTED', 
+                             'expect_output', 'target', 'Target', 'TARGET', 'expect', 'Expect']
+    TOOL_CALLS_ALTERNATIVES = ['tool_calls', 'expected_tools', 'expected_tool_calls', 'expect_tools_calls', 'ToolCalls']
+    TOOLS_ALTERNATIVES = ['tools', 'available_tools', 'avalible_tools']
+    CONTEXT_ALTERNATIVES = ['context', 'passage', 'document', 'context_retrieved_column']
+    
+    @staticmethod
+    def find_column(columns: List[str], preferred: str, alternatives: List[str]) -> str:
+        """查找列名，如果首选列不存在，则尝试备选列"""
+        if preferred in columns:
+            return preferred
         
-        Args:
-            tools_data: 工具数据（可能是字符串、列表、字典等）
-            
-        Returns:
-            解析后的工具数据
-        """
+        for alt in alternatives:
+            if alt in columns:
+                return alt
+        
+        # 如果都找不到，返回首选列名（会触发后续的错误处理）
+        return preferred
+    
+    @staticmethod
+    def parse_tools_field(tools_data: Any) -> Union[List[Dict], str, List]:
+        """解析工具字段数据"""
         if tools_data is None:
             return []
         
@@ -593,10 +105,334 @@ class Dataset():
         else:
             # 其他类型，转换为字符串
             return str(tools_data)
+    
+    @staticmethod
+    def safe_get_value(data: Dict[str, Any], key: str, default: Any = "") -> Any:
+        """安全获取字典值"""
+        value = data.get(key, default)
+        return str(value) if value is not None else default
+    
+    @staticmethod
+    def parse_multi_turn_input(multi_turn_data: Any) -> List[str]:
+        """解析多轮对话输入"""
+        if not multi_turn_data:
+            return []
+        
+        if isinstance(multi_turn_data, str):
+            try:
+                if multi_turn_data.strip():
+                    parsed = json.loads(multi_turn_data)
+                    if isinstance(parsed, list) and parsed and isinstance(parsed[0], list) and parsed[0]:
+                        return [x['content'] for x in parsed[0]]    #暂不支持多list
+                        
+                    else:
+                        return [multi_turn_data.strip()]
+                else:
+                    return []
+            except (json.JSONDecodeError, ValueError):
+                return [multi_turn_data.strip()]
+        elif isinstance(multi_turn_data, list):
+            return multi_turn_data
+        else:
+            return [str(multi_turn_data)]
+
+class BaseDataLoader(ABC):
+    """数据加载器基类"""
+    
+    def __init__(self, field_mapping: FieldMapping):
+        self.field_mapping = field_mapping
+    
+    @abstractmethod
+    def load_data(self, **kwargs) -> List[Dict[str, Any]]:
+        """加载数据的抽象方法"""
+        pass
+    
+    def process_record(self, record: Dict[str, Any], index: int) -> Dict[str, Any]:
+        """处理单条记录"""
+        mapping = self.field_mapping
+        
+        test_case = {
+            'id': self._get_id(record, index),
+            'input': DataProcessor.safe_get_value(record, mapping.input_column),
+            'expected_output': DataProcessor.safe_get_value(record, mapping.expected_column)
+        }
+        
+        # 处理用例名称
+        if mapping.case_name_column and mapping.case_name_column in record:
+            test_case['name'] = DataProcessor.safe_get_value(record, mapping.case_name_column)
+        
+        # 处理多轮对话输入
+        if mapping.multi_turn_input_column and mapping.multi_turn_input_column in record:
+            multi_turn_input = record[mapping.multi_turn_input_column]
+            test_case['input_list'] = DataProcessor.parse_multi_turn_input(multi_turn_input)
+        else:
+            test_case['input_list'] = []
+        
+        # 处理可用工具
+        if mapping.available_tools_column and mapping.available_tools_column in record:
+            available_tools = record[mapping.available_tools_column]
+            test_case['available_tools'] = DataProcessor.parse_tools_field(available_tools)
+        else:
+            test_case['available_tools'] = []
+        
+        # 处理预期工具调用
+        if mapping.expected_tool_call_column and mapping.expected_tool_call_column in record:
+            expected_tools = record[mapping.expected_tool_call_column]
+            test_case['expected_tools'] = DataProcessor.parse_tools_field(expected_tools)
+        else:
+            test_case['expected_tools'] = []
+        
+        # 处理上下文
+        if mapping.context_column and mapping.context_column in record:
+            test_case['context'] = DataProcessor.safe_get_value(record, mapping.context_column)
+        
+        # 处理额外字段
+        if mapping.extra_fields:
+            test_case['extra_fields'] = {}
+            for field in mapping.extra_fields:
+                if field in record:
+                    test_case['extra_fields'][field] = DataProcessor.safe_get_value(record, field)
+        
+        # 添加其他未明确处理的字段
+        # processed_keys = {mapping.input_column, mapping.expected_column, mapping.expected_tool_call_column,
+        #                  mapping.available_tools_column, mapping.context_column, mapping.id_column,
+        #                  mapping.multi_turn_input_column, mapping.case_name_column} | set(mapping.extra_fields)
+        
+        # for key, value in record.items():
+        #     if key not in processed_keys and key not in test_case:
+        #         test_case[key] = DataProcessor.safe_get_value(record, key)
+        
+        return test_case
+    
+    def _get_id(self, record: Dict[str, Any], index: int) -> Any:
+        """获取记录ID"""
+        if self.field_mapping.id_column and self.field_mapping.id_column in record:
+            return record[self.field_mapping.id_column]
+        return index + 1
+
+class CSVDataLoader(BaseDataLoader):
+    """CSV数据加载器"""
+    
+    def load_data(self, file_path: str = None, csv_file: str = None, **kwargs) -> List[Dict[str, Any]]:
+        """加载CSV数据"""
+        try:
+            # 确定文件路径
+            file_path = csv_file or file_path
+            if not file_path:
+                raise ValueError("必须提供CSV文件路径")
+            
+            # 读取CSV文件
+            df = pd.read_csv(file_path)
+            columns = df.columns.tolist()
+            
+            # 自动检测列名
+            self._auto_detect_columns(columns)
+            
+            # 处理每条记录
+            test_cases = []
+            for index, row in df.iterrows():
+                record = {col: str(row[col]) if pd.notna(row[col]) else "" for col in columns}
+                test_case = self.process_record(record, index)
+                test_cases.append(test_case)
+            
+            return test_cases
+            
+        except FileNotFoundError:
+            raise FileNotFoundError(f"CSV文件 '{file_path}' 不存在")
+        except Exception as e:
+            logger.error(f"读取CSV文件时发生错误: {str(e)}")
+            raise Exception(f"读取CSV文件时发生错误: {str(e)}")
+    
+    def _auto_detect_columns(self, columns: List[str]):
+        """自动检测CSV列名"""
+        mapping = self.field_mapping
+        
+        mapping.input_column = DataProcessor.find_column(columns, mapping.input_column, DataProcessor.INPUT_ALTERNATIVES)
+        mapping.expected_column = DataProcessor.find_column(columns, mapping.expected_column, DataProcessor.EXPECTED_ALTERNATIVES)
+        mapping.expected_tool_call_column = DataProcessor.find_column(columns, mapping.expected_tool_call_column, DataProcessor.TOOL_CALLS_ALTERNATIVES)
+        mapping.available_tools_column = DataProcessor.find_column(columns, mapping.available_tools_column, DataProcessor.TOOLS_ALTERNATIVES)
+        mapping.context_column = DataProcessor.find_column(columns, mapping.context_column, DataProcessor.CONTEXT_ALTERNATIVES)
+
+class JSONLDataLoader(BaseDataLoader):
+    """JSONL数据加载器"""
+    
+    def load_data(self, file_path: str, **kwargs) -> List[Dict[str, Any]]:
+        """加载JSONL数据"""
+        try:
+            test_cases = []
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:  # 跳过空行
+                        continue
+                    
+                    try:
+                        # 解析JSON行
+                        record = json.loads(line)
+                        
+                        # 自动检测列名（对于第一条记录）
+                        if line_num == 1:
+                            self._auto_detect_columns(list(record.keys()))
+                        
+                        test_case = self.process_record(record, line_num - 1)
+                        test_cases.append(test_case)
+                        
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"第{line_num}行JSON解析失败: {e}")
+                        continue
+                    except Exception as e:
+                        logger.warning(f"处理第{line_num}行时发生错误: {e}")
+                        continue
+            
+            return test_cases
+            
+        except FileNotFoundError:
+            raise FileNotFoundError(f"JSONL文件 '{file_path}' 不存在")
+        except Exception as e:
+            logger.error(f"读取JSONL文件时发生错误: {str(e)}")
+            raise Exception(f"读取JSONL文件时发生错误: {str(e)}")
+    
+    def _auto_detect_columns(self, columns: List[str]):
+        """自动检测JSONL列名"""
+        mapping = self.field_mapping
+        
+        mapping.input_column = DataProcessor.find_column(columns, mapping.input_column, DataProcessor.INPUT_ALTERNATIVES)
+        mapping.expected_column = DataProcessor.find_column(columns, mapping.expected_column, DataProcessor.EXPECTED_ALTERNATIVES)
+        mapping.expected_tool_call_column = DataProcessor.find_column(columns, mapping.expected_tool_call_column, DataProcessor.TOOL_CALLS_ALTERNATIVES)
+        mapping.available_tools_column = DataProcessor.find_column(columns, mapping.available_tools_column, DataProcessor.TOOLS_ALTERNATIVES)
+        mapping.context_column = DataProcessor.find_column(columns, mapping.context_column, DataProcessor.CONTEXT_ALTERNATIVES)
+
+class HuggingFaceDataLoader(BaseDataLoader):
+    """HuggingFace数据加载器"""
+    
+    def load_data(self, huggingface_repo: str, config_name: str = None, split: str = 'test', **kwargs) -> List[Dict[str, Any]]:
+        """加载HuggingFace数据"""
+        try:
+            # 从Hugging Face Hub加载数据集
+            load_params = {'split': split}
+            if config_name:
+                load_params['name'] = config_name
+            
+            dataset_dict = load_dataset(huggingface_repo, **load_params)
+            hf_dataset = []
+            # 确保我们有一个Dataset对象
+            if isinstance(dataset_dict, DatasetDict):
+                hf_dataset.append(dataset_dict[split])
+            else:
+                hf_dataset = dataset_dict
+            
+            # 处理每条记录
+            test_cases = []
+            # 获取数据集的特征（列名）
+            for hf_dataset in hf_dataset:
+                features = hf_dataset.features
+                columns = list(features.keys())
+            
+                # 自动检测列名
+                self._auto_detect_columns(columns)
+                
+                
+                for idx, sample in enumerate(hf_dataset):
+                    record = {key: sample.get(key) for key in columns}
+                    test_case = self.process_record(record, idx)
+                    test_cases.append(test_case)
+                
+            return test_cases
+            
+        except Exception as e:
+            logger.error(f"加载Hugging Face数据集时发生错误: {str(e)}")
+            raise Exception(f"加载Hugging Face数据集时发生错误: {str(e)}")
+    
+    def _auto_detect_columns(self, columns: List[str]):
+        """自动检测HuggingFace列名"""
+        mapping = self.field_mapping
+        
+        mapping.input_column = DataProcessor.find_column(columns, mapping.input_column, DataProcessor.INPUT_ALTERNATIVES)
+        mapping.expected_column = DataProcessor.find_column(columns, mapping.expected_column, DataProcessor.EXPECTED_ALTERNATIVES)
+        mapping.expected_tool_call_column = DataProcessor.find_column(columns, mapping.expected_tool_call_column, DataProcessor.TOOL_CALLS_ALTERNATIVES)
+        mapping.available_tools_column = DataProcessor.find_column(columns, mapping.available_tools_column, DataProcessor.TOOLS_ALTERNATIVES)
+        mapping.context_column = DataProcessor.find_column(columns, mapping.context_column, DataProcessor.CONTEXT_ALTERNATIVES)
+
+class Dataset:
+    """
+    数据集基类，用于加载和管理不同类型的数据集
+    """
+    
+    def __init__(
+        self,
+        name: str,
+        description: str
+    ):
+        self.name = name
+        self.description = description
+        self.testcases = []
+        self._loaders = {
+            DataFormat.CSV: CSVDataLoader,
+            DataFormat.JSONL: JSONLDataLoader,
+            DataFormat.HUGGINGFACE: HuggingFaceDataLoader,
+        }
+
+    def load(
+        self,
+        load_type: str = Field(
+            default='csv',
+            examples=['csv', 'jsonl', 'trace_local', 'trace_cloud', 'huggingface'],
+            description='数据载入类型'
+        ),
+        **kwargs
+    ):
+        """
+        加载数据集的基本方法
+        """
+        try:
+            # 转换load_type为枚举
+            if isinstance(load_type, str):
+                load_type = DataFormat(load_type)
+            
+            columns_mapping = kwargs.get('columns_name', {})
+            
+
+            field_mapping = FieldMapping(**columns_mapping)
+            
+            # 获取对应的数据加载器
+            loader_class = self._loaders.get(load_type)
+            if not loader_class:
+                raise ValueError(f"不支持的数据加载类型: {load_type}")
+            
+            # 创建加载器实例并加载数据
+            loader = loader_class(field_mapping)
+            
+            
+            self.testcases = loader.load_data(**kwargs)
+            logger.info(f"成功加载 {len(self.testcases)} 条测试用例")
+            
+        except Exception as e:
+            logger.error(f"数据加载失败: {str(e)}")
+            raise
+
+    def get_testcase(self):
+        """获取测试用例生成器"""
+        for testcase in self.testcases:
+            yield testcase
+
+    @abstractmethod
+    def from_trace_local(self):
+        """
+        从本地trace文件加载数据集
+        """
+        pass
+
+    @abstractmethod
+    def from_cloud(self):
+        """
+        从云端加载数据集
+        """
+        pass
 
 if __name__ == "__main__":
-    
+    # 测试代码
     dataset = Dataset(name='bytedance-research/veAgentBench', description='test')
-    dataset.load(load_type='huggingface', split='test[:1]',config_name='financial_analysis', input_column='input', expected_column='expect_output', expected_tool_call_column='expected_tool_calls')
+    dataset.load(load_type='huggingface', config_name='financial_analysis', split='test[:1]')
     for test in dataset.get_testcase():
         print(test)

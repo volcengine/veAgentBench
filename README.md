@@ -93,10 +93,22 @@ tasks:
         description: Legal Aid Assistant                 # Dataset description
         property:                               # Dataset-related properties
           type: huggingface                     # Dataset type, supports csv, huggingface
+          huggingface_repo: bytedance-research/veAgentBench  #huggingface Dataset名称
           config_name: legal_aid   
-          split: "test[:1]"      
-          input_column: "input"
-          expected_output_column: "expect_output"
+          split:                              #split，列表
+            - test[:1]  
+          columns_name:
+            input_column: "input"                                 #输入prompt
+            expected_column: "expected_column"                    #预期输出结果
+            expected_tool_call_column: "expected_tool_call_column"  #预期工具调用结果
+            available_tools_column: "available_tools_column"        #可用工具列表
+            id_column: "id_column"                                  #用例ID
+            multi_turn_input_column: "multi_turn_input_column"      #多轮对话输入column
+            case_name_column: "case_name_column"                    #用例名称
+            extra_fields: ["extra_column_1", "extra_column_2"]      #额外需要导入的column
+            extra_column_1: ""
+            extra_column_2: ""
+
     metrics:                                    # Evaluation metrics
       - AnswerCorrectnessMetric
     judge_model:                   # Judge model configuration
@@ -109,6 +121,11 @@ tasks:
         agent_name: "financial_analysis_agent"  # Agent name
         end_point: "http://127.0.0.1:8000/invoke"  # Call endpoint
         api_key: "your_api_key"     # Agent API key (needs replacement)
+        generation_kwargs:
+          max_tokens: 20480
+          extra_body:
+            thinking:
+              type: "disabled"
     max_concurrent: 5              # Concurrent calls to agent under test
     measure_concurrent: 100        # Evaluation concurrency: 100 samples
     cache_dir: "./cache"           # Cache directory path
@@ -120,15 +137,18 @@ tasks:
 
 ```yaml
     datasets:
-      - name: bytedance-research/veAgentBench   # HuggingFace dataset name
+      - name: financial_analysis   # datasetname
         description: Financial Analysis Test Set
         property:
           type: huggingface                    # Dataset type
           config_name: financial_analysis      # Subset name
-          split: "test[:1]"                    # Split, can be left blank. Specify if running few cases
-          input_column: "input"                 # Input column name
-          expected_output_column: "expect_output"   # Expected response column name
-          expected_tool_call_column: "expected_tool_calls"  # Expected tool call column name
+          huggingface_repo: bytedance-research/veAgentBench
+          split: 
+            - test[:1]                  # Split, can be left blank. Specify if running few cases
+          columns_name:
+            input_column: "input"                 # Input column name
+            expected_column: "expect_output"   # Expected response column name
+            expected_tool_call_column: "expected_tool_calls"  # Expected tool call column name
 ```
 
 ##### Local CSV File Dataset Configuration
@@ -139,10 +159,11 @@ tasks:
         description: Legal Consultation Customer Service Evaluation Set    # Dataset description
         property:
           type: csv                     # Dataset type
-          csv_file_path: "dataset/test1.csv"       # Local dataset file
-          input_column: "input"                    # Input column name
-          expected_output_column: "expect_output"   # Expected response column name
-          expected_tool_call_column: "expected_tool_calls"    # Expected tool call column name
+          csv_file: "dataset/test1.csv"       # Local dataset file
+          columns_name:
+            input_column: "input"                    # Input column name
+            expected_column: "expect_output"   # Expected response column name
+            expected_tool_call_column: "expected_tool_calls"    # Expected tool call column name
 ```
 
 #### Agent Under Test Configuration Guide
