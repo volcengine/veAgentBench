@@ -73,7 +73,7 @@ class CachedTestRun(BaseModel):
         except AttributeError:
             # Pydantic version below 2.0
             body = self.dict(by_alias=True, exclude_none=True)
-        json.dump(body, f, cls=CustomEncoder)
+        json.dump(body, f, cls=CustomEncoder, ensure_ascii=False, indent=4)
         return self
 
     # load from file (this happens initially during a test run)

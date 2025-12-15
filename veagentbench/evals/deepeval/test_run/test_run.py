@@ -30,7 +30,8 @@ from veagentbench.evals.deepeval.utils import (
     format_turn,
     len_short,
 )
-from veagentbench.evals.deepeval.test_run.cache import global_test_run_cache_manager
+
+from veagentbench.evals.deepeval.test_run.contextual_cache_manager import global_contextual_test_run_cache_manager, get_contextual_cache_manager
 from veagentbench.evals.deepeval.constants import CONFIDENT_TEST_CASE_BATCH_SIZE, HIDDEN_DIR
 from  datetime import datetime
 from uuid import uuid4
@@ -380,7 +381,7 @@ class TestRun(BaseModel):
         except AttributeError:
             # Pydantic version below 2.0
             body = self.dict(by_alias=True, exclude_none=True)
-        json.dump(body, f, cls=TestRunEncoder)
+        json.dump(body, f, cls=TestRunEncoder, ensure_ascii=False, indent=4)
         return self
 
     @classmethod
@@ -939,19 +940,19 @@ class TestRunManager:
             print("All metrics errored for all test cases, please try again.")
             delete_file_if_exists(self.temp_file_path)
             delete_file_if_exists(
-                global_test_run_cache_manager.temp_cache_file_name
+                global_contextual_test_run_cache_manager.temp_cache_file_name
             )
             return
         test_run.run_duration = runDuration
         test_run.calculate_test_passes_and_fails()
         test_run.sort_test_cases()
 
-        if global_test_run_cache_manager.disable_write_cache is None:
-            global_test_run_cache_manager.disable_write_cache = not bool(
+        if global_contextual_test_run_cache_manager.disable_write_cache is None:
+            global_contextual_test_run_cache_manager.disable_write_cache = not bool(
                 get_is_running_deepeval()
             )
 
-        global_test_run_cache_manager.wrap_up_cached_test_run()
+        global_contextual_test_run_cache_manager.wrap_up_cached_test_run()
 
         if display_table:
             self.display_results_table(test_run, display)

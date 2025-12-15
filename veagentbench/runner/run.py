@@ -88,20 +88,12 @@ class AgentTestRunner:
         property_config = dataset_config.get('property', {})
         load_type = property_config.get('type', 'csv')
         
-        if load_type in ['csv', 'jsonl']:
+        if load_type in ['csv', 'jsonl', 'huggingface']:
             dataset.load(
                 load_type=load_type,
                 **property_config
             )
-        elif load_type == 'huggingface':
-            dataset.load(
-                load_type='huggingface',
-                config_name=property_config.get('config_name', ''),
-                split=property_config.get('split', 'test'),
-                input_column=property_config.get('input_column', 'input_column'),
-                expected_column=property_config.get('expected_column', 'expected_column'),
-                expected_tool_call_column=property_config.get('expected_tool_call_column', 'expected_tool_call_column')
-            )
+
         else:
             raise ValueError(f"不支持的数据集类型: {load_type}")
             
@@ -118,7 +110,8 @@ class AgentTestRunner:
             _openai_api_key=judge_model_config.get('api_key', ''),
             temperature=0,
             cost_per_input_token=0.000002,
-            cost_per_output_token=0.000008
+            cost_per_output_token=0.000008,
+            generation_kwargs=judge_model_config.get('generation_kwargs', {'max_tokens': 20480}),
         )
         
         for metric_name in metric_names:
@@ -129,7 +122,7 @@ class AgentTestRunner:
                     
                     # 根据指标类型创建实例
 
-                    metrics.append(metric_class(model=judge_model, model_name=judge_model_config.get('model_name', 'gpt-4')))
+                    metrics.append(metric_class(model=judge_model))
                     
                     logger.info(f"成功创建指标: {metric_name}")
                 else:

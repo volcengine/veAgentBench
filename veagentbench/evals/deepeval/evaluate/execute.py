@@ -69,10 +69,14 @@ from veagentbench.evals.deepeval.test_run import (
     TestRun,
 )
 from veagentbench.evals.deepeval.test_run.cache import (
-    global_test_run_cache_manager,
     Cache,
     CachedTestCase,
     CachedMetricData,
+)
+from veagentbench.evals.deepeval.test_run.contextual_cache_manager import (
+    get_contextual_cache_manager,
+    global_contextual_test_run_cache_manager,
+    ContextualCacheConfig
 )
 from veagentbench.evals.deepeval.evaluate.types import TestResult
 from veagentbench.evals.deepeval.evaluate.utils import (
@@ -133,12 +137,16 @@ def execute_test_cases(
     _use_bar_indicator: bool = True,
     _is_assert_test: bool = False,
 ) -> List[TestResult]:
-    global_test_run_cache_manager.disable_write_cache = (
+    # 获取正确的缓存管理器
+    if isinstance(cache_config, ContextualCacheConfig):
+        get_contextual_cache_manager(cache_config)
+
+    global_contextual_test_run_cache_manager.disable_write_cache = (
         cache_config.write_cache is False
     )
 
     if test_run_manager is None:
-        test_run_manager = global_test_run_manager
+        test_run_manager = TestRunManager()
 
     test_run_manager.save_to_disk = cache_config.write_cache
     test_run = test_run_manager.get_test_run(identifier=identifier)
@@ -187,7 +195,7 @@ def execute_test_cases(
                     cached_test_case = None
                     if cache_config.use_cache:
                         cached_test_case = (
-                            global_test_run_cache_manager.get_cached_test_case(
+                            global_contextual_test_run_cache_manager.get_cached_test_case(
                                 test_case, test_run.hyperparameters
                             )
                         )
@@ -249,12 +257,12 @@ def execute_test_cases(
                     test_run_manager.update_test_run(api_test_case, test_case)
 
                     ### Cache Test Run ###
-                    global_test_run_cache_manager.cache_test_case(
+                    global_contextual_test_run_cache_manager.cache_test_case(
                         test_case,
                         new_cached_test_case,
                         test_run.hyperparameters,
                     )
-                    global_test_run_cache_manager.cache_test_case(
+                    global_contextual_test_run_cache_manager.cache_test_case(
                         test_case,
                         new_cached_test_case,
                         test_run.hyperparameters,
@@ -378,11 +386,16 @@ async def a_execute_test_cases(
         async with semaphore:
             return await func(*args, **kwargs)
 
-    global_test_run_cache_manager.disable_write_cache = (
+    # 获取正确的缓存管理器
+    if isinstance(cache_config, ContextualCacheConfig):
+        get_contextual_cache_manager(cache_config)
+
+
+    global_contextual_test_run_cache_manager.disable_write_cache = (
         cache_config.write_cache is False
     )
     if test_run_manager is None:
-        test_run_manager = global_test_run_manager
+        test_run_manager = TestRunManager()
 
     test_run_manager.save_to_disk = cache_config.write_cache
     test_run = test_run_manager.get_test_run(identifier=identifier)
@@ -595,6 +608,7 @@ async def _a_execute_llm_test_cases(
         total=len(metrics),
     )
     show_metrics_indicator = show_indicator and not _use_bar_indicator
+    # 获取正确的缓存管理器
 
     cached_test_case = None
     for metric in metrics:
@@ -603,7 +617,7 @@ async def _a_execute_llm_test_cases(
 
     # only use cache when NOT conversational test case
     if use_cache:
-        cached_test_case = global_test_run_cache_manager.get_cached_test_case(
+        cached_test_case = global_contextual_test_run_cache_manager.get_cached_test_case(
             test_case,
             test_run.hyperparameters,
         )
@@ -656,12 +670,12 @@ async def _a_execute_llm_test_cases(
     test_run_manager.update_test_run(api_test_case, test_case)
 
     ### Cache Test Run ###
-    global_test_run_cache_manager.cache_test_case(
+    global_contextual_test_run_cache_manager.cache_test_case(
         test_case,
         new_cached_test_case,
         test_run.hyperparameters,
     )
-    global_test_run_cache_manager.cache_test_case(
+    global_contextual_test_run_cache_manager.cache_test_case(
         test_case,
         new_cached_test_case,
         test_run.hyperparameters,
@@ -806,8 +820,12 @@ def execute_agentic_test_cases(
     _use_bar_indicator: bool = True,
     _is_assert_test: bool = False,
 ) -> List[TestResult]:
+    # 获取正确的缓存管理器
+    if isinstance(cache_config, ContextualCacheConfig):
+        get_contextual_cache_manager(cache_config)
 
-    test_run_manager = global_test_run_manager
+
+    test_run_manager = TestRunManager()
 
     test_run_manager.save_to_disk = cache_config.write_cache
     test_run_manager.get_test_run(identifier=identifier)
@@ -1099,7 +1117,12 @@ async def a_execute_agentic_test_cases(
         async with semaphore:
             return await func(*args, **kwargs)
 
-    test_run_manager = global_test_run_manager
+    # 获取正确的缓存管理器
+    if isinstance(cache_config, ContextualCacheConfig):
+        get_contextual_cache_manager(cache_config)
+
+
+    test_run_manager = TestRunManager()
     test_run_manager.save_to_disk = cache_config.write_cache
     test_run_manager.get_test_run(identifier=identifier)
     local_trace_manager = trace_manager
@@ -1481,8 +1504,12 @@ def execute_agentic_test_cases_from_loop(
     _use_bar_indicator: bool = True,
     _is_assert_test: bool = False,
 ) -> Iterator[TestResult]:
+    # 获取正确的缓存管理器
+    if isinstance(cache_config, ContextualCacheConfig):
+        get_contextual_cache_manager(cache_config)
 
-    test_run_manager = global_test_run_manager
+
+    test_run_manager = TestRunManager()
     test_run_manager.save_to_disk = cache_config.write_cache
     test_run_manager.get_test_run(identifier=identifier)
 
@@ -1763,11 +1790,14 @@ def a_execute_agentic_test_cases_from_loop(
     _use_bar_indicator: bool = True,
     _is_assert_test: bool = False,
 ) -> Iterator[TestResult]:
-
     semaphore = asyncio.Semaphore(async_config.max_concurrent)
     original_create_task = asyncio.create_task
 
-    test_run_manager = global_test_run_manager
+    # 获取正确的缓存管理器
+    if isinstance(cache_config, ContextualCacheConfig):
+        get_contextual_cache_manager(cache_config)
+
+    test_run_manager = TestRunManager()
     test_run_manager.save_to_disk = cache_config.write_cache
     test_run = test_run_manager.get_test_run(identifier=identifier)
 

@@ -144,7 +144,7 @@ def serialize_dict_with_sorting(obj):
 
 
 def serialize(obj) -> Union[str, None]:
-    return json.dumps(serialize_dict_with_sorting(obj), sort_keys=True)
+    return json.dumps(serialize_dict_with_sorting(obj), sort_keys=True, ensure_ascii=False)
 
 
 def get_or_create_event_loop() -> asyncio.AbstractEventLoop:

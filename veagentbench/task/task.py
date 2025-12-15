@@ -26,6 +26,7 @@ from veagentbench.agents.adk_agents import AgentOutPut
 from veagentbench.test_case.agent_test_case import ToolExecutionResult, ToolCallExpected
 from veadk.utils.logger import get_logger
 from veagentbench.evals.deepeval.evaluate import AsyncConfig, ErrorConfig, CacheConfig
+from veagentbench.evals.deepeval.test_run.contextual_cache_manager import ContextualCacheConfig
 from veagentbench.evals.deepeval import evaluate
 from veagentbench.dataset.dataset import Dataset
 from veagentbench.models.models import VolceOpenAI
@@ -135,10 +136,20 @@ class AgentTask(BaseTask):
             
             # 评估结果
             if agent_testcases:
+                # 创建上下文感知的缓存配置
+                contextual_cache_config = ContextualCacheConfig(
+                    use_cache=self.enable_score_cache,
+                    write_cache=True,
+                    task_name=self.task_name,
+                    dataset_name=dataset.name,
+                    agent_name=self.agent.agent_name if hasattr(self.agent, 'agent_name') else None,
+                    cache_base_dir=self.cache_dir
+                )
+                
                 evaluate_result = evaluate(agent_testcases, self.metrics, 
                                              async_config=AsyncConfig(max_concurrent=self.measure_concurrent), 
                                              error_config=ErrorConfig(ignore_errors=False), 
-                                             cache_config=CacheConfig(use_cache=self.enable_score_cache, write_cache=True)
+                                             cache_config=contextual_cache_config
                                             )
                 _m_result = {
                     'dataset_name': dataset.name,
