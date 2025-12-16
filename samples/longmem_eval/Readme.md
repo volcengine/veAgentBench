@@ -24,13 +24,13 @@ export VOLCENGINE_SECRET_KEY=""
 
 
 #mem0记忆库环境变量配置，从agentkit 记忆库中的集成代码中拷贝
-export DATABASE_MEM0_BASE_URL=https://mem0-cnlfjzigaku8gczkzo.mem0.volces.com:8000
-export DATABASE_MEM0_API_KEY=53f9ff1d-a5d0-5024-a80f-f3a6e9ccc3ce
+export DATABASE_MEM0_BASE_URL=
+export DATABASE_MEM0_API_KEY=
 export MEM0_BATCHSIZE    #mem0记忆库导入时的batchsize配置，默认为4
 
 #viking记忆库环境变量配置，从agentkit 记忆库中的集成代码中拷贝
-export DATABASE_VIKINGMEM_COLLECTION=longmem_s_default
-export DATABASE_VIKINGMEM_MEMORY_TYPE=memory_summary_as6ox5,memory_semantic_hrei4c,memory_userpreference_5u7np1
+export DATABASE_VIKINGMEM_COLLECTION=
+export DATABASE_VIKINGMEM_MEMORY_TYPE=
 
 ```
 
@@ -41,8 +41,13 @@ python  add_mem0_longmem.py   #导入mem0记忆。导入开始到解析完成预
 python add_viking_longmem.py   #导入viking记忆，预计要2小时
 ```
 
+
 ## 执行评测
 
+### 修改任务配置文件
+test_mem0.yaml和test_viking.yaml中，修改judge_model的配置即可。
+
+### 任务执行
 ```
 veagentbench run --config samples/longmem_eval/test_mem0.yaml     #测试mem0
 veagentbench run --config samples/longmem_eval/test_viking.yaml    #测试viking
