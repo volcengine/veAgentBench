@@ -5,7 +5,7 @@
 ```bash
 uv pip install git+https://code.byted.org/pris/mem0.git
 uv pip install vikingdb-python-sdk
-uv pip install git+https://github.com/brianxb001/veadk-python.git@memtest   #安装制定版本veadk，主要是适配了viking关于记忆使用方式
+uv pip install git+https://github.com/brianxb001/veadk-python.git@memtest   #安装制定版本veadk，主要是适配了viking memory关于记忆使用方式
 ```
 
 ### 数据集准备
