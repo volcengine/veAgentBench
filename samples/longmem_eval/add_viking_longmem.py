@@ -24,7 +24,7 @@ from threading import Lock
 import re
 import datetime
 
-API_KEY = os.getenv("VIKING_MEMORY_API_KEY", "2GFTZH07D00ER9ZXRFZTJGZPWRYSS1ADJDR03S55RN4M1RVWM5T060R30C1G6CTK0")
+API_KEY = os.getenv("VIKING_MEMORY_API_KEY")
 client = VikingMem(
     host = "api-knowledgebase.mlp.cn-beijing.volces.com",
     region = "cn-beijing",
