@@ -31,6 +31,7 @@ export MEM0_BATCHSIZE    #mem0记忆库导入时的batchsize配置，默认为4
 #viking记忆库环境变量配置，从agentkit 记忆库中的集成代码中拷贝
 export DATABASE_VIKINGMEM_COLLECTION=
 export DATABASE_VIKINGMEM_MEMORY_TYPE=
+export VIKING_MEMORY_API_KEY=
 
 ```
 
