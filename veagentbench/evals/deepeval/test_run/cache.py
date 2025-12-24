@@ -216,6 +216,9 @@ class TestRunCacheManager:
                     file=sys.stderr,
                 )
 
+            if should_create_cached_test_run:
+                self.create_cached_test_run(temp=from_temp)
+
             return self.temp_cached_test_run
         else:
             if self.cached_test_run:
