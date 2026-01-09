@@ -29,6 +29,7 @@ class DataFormat(Enum):
     """数据格式枚举"""
     CSV = "csv"
     JSONL = "jsonl"
+    JSON = 'json'
     HUGGINGFACE = "huggingface"
     TRACE_LOCAL = "trace_local"
     TRACE_CLOUD = "trace_cloud"
@@ -303,6 +304,54 @@ class JSONLDataLoader(BaseDataLoader):
         mapping.available_tools_column = DataProcessor.find_column(columns, mapping.available_tools_column, DataProcessor.TOOLS_ALTERNATIVES)
         mapping.context_column = DataProcessor.find_column(columns, mapping.context_column, DataProcessor.CONTEXT_ALTERNATIVES)
 
+
+class JSONDataLoader(BaseDataLoader):
+    """JSON数据加载器"""
+    
+    def load_data(self, file_path: str, **kwargs) -> List[Dict[str, Any]]:
+        """加载JSONL数据"""
+        try:
+            test_cases = []
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.loads(f.read())
+                for line_num, record in enumerate(data):
+                    
+                    try:
+                        
+                        # 自动检测列名（对于第一条记录）
+                        if line_num == 1:
+                            self._auto_detect_columns(list(record.keys()))
+                        
+                        test_case = self.process_record(record, line_num - 1)
+                        test_cases.append(test_case)
+                        
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"第{line_num}行JSON解析失败: {e}")
+                        continue
+                    except Exception as e:
+                        logger.warning(f"处理第{line_num}行时发生错误: {e}")
+                        continue
+            
+            return test_cases
+            
+        except FileNotFoundError:
+            raise FileNotFoundError(f"JSONL文件 '{file_path}' 不存在")
+        except Exception as e:
+            logger.error(f"读取JSONL文件时发生错误: {str(e)}")
+            raise Exception(f"读取JSONL文件时发生错误: {str(e)}")
+    
+    def _auto_detect_columns(self, columns: List[str]):
+        """自动检测JSONL列名"""
+        mapping = self.field_mapping
+        
+        mapping.input_column = DataProcessor.find_column(columns, mapping.input_column, DataProcessor.INPUT_ALTERNATIVES)
+        mapping.expected_column = DataProcessor.find_column(columns, mapping.expected_column, DataProcessor.EXPECTED_ALTERNATIVES)
+        mapping.expected_tool_call_column = DataProcessor.find_column(columns, mapping.expected_tool_call_column, DataProcessor.TOOL_CALLS_ALTERNATIVES)
+        mapping.available_tools_column = DataProcessor.find_column(columns, mapping.available_tools_column, DataProcessor.TOOLS_ALTERNATIVES)
+        mapping.context_column = DataProcessor.find_column(columns, mapping.context_column, DataProcessor.CONTEXT_ALTERNATIVES)
+
+
 class HuggingFaceDataLoader(BaseDataLoader):
     """HuggingFace数据加载器"""
     
@@ -371,6 +420,7 @@ class Dataset:
             DataFormat.CSV: CSVDataLoader,
             DataFormat.JSONL: JSONLDataLoader,
             DataFormat.HUGGINGFACE: HuggingFaceDataLoader,
+            DataFormat.JSON: JSONDataLoader
         }
 
     def load(

@@ -39,6 +39,8 @@ from .bfcl_multiturn._bfcl_multiturn import BFCLMultiTurnMetric
 
 from .tokens_metric._tokens_metric import TokensMetric
 
+from .live_mcp_bench._live_mcp_tool import LiveMcpBenchMetric
+
 # Locomo 度量指标
 from .locomo import LocomoMetric,LocomoLLMMetric
 from .longmemeval import LongMemEvalMetric
@@ -101,6 +103,7 @@ __all__ = [
     "BFCLMultiTurnMetric",
     "LongMemEvalMetric",
     "LocomoLLMMetric",
+    "LiveMcpBenchMetric"
     
     # DeepEval 核心度量指标
     "GEval",
