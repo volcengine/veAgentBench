@@ -195,6 +195,7 @@ class LocalAdkAgent(BaseAgent):
                         tool_name = call.name
                         arguments = call.args
                         tool_id = call.id
+                        
                         tool_called[tool_id] = {
                             "name": tool_name,
                             "input_parameters": arguments,
@@ -351,6 +352,8 @@ class LocomoAgent(LocalAdkAgent):
         def extract_user_id(question):
             # 根据问题内容提取user_id
             # 定义所有在QA问题中发现的用户
+            index = question.find("Question:")
+            question = question[index + len("Question:"):].strip() if index != -1 else question
             unique_users = {"Caroline", "Melanie", "Jon", "Gina", "Maria", "John", "Joanna", "Nate", "Tim", "Audrey", "Andrew",
                             "James", "Deborah", "Jolene", "Evan", "Sam", "Calvin", "Dave"}
 
@@ -358,14 +361,15 @@ class LocomoAgent(LocalAdkAgent):
                 if user in question:
                     return user
         idx = kwargs.get('idx', None)
+        users = kwargs.get('users', None)
         user_id = extract_user_id(prompt) or user_id
-        
+        user_list = users.split('|') if users else []
         if idx is not None:
             idx = int(idx)
-            user_id = f"{user_id}_{idx}"
+            user_list =[f"{user_id}_{idx}" for user_id in user_list]
         return await super().generate_output(
             prompt=prompt,
-            user_id=user_id,
+            user_id='|'.join(user_list),
             session_id=session_id,
             **kwargs
         )

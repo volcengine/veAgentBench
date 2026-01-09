@@ -88,7 +88,7 @@ class AgentTestRunner:
         property_config = dataset_config.get('property', {})
         load_type = property_config.get('type', 'csv')
         
-        if load_type in ['csv', 'jsonl', 'huggingface']:
+        if load_type in ['csv', 'jsonl', 'huggingface', 'json']:
             dataset.load(
                 load_type=load_type,
                 **property_config
