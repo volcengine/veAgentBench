@@ -125,7 +125,7 @@ class ContextualRecallMetric(BaseMetric):
 
             return self.score
         
-    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
+    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,), throw_exceptions=False, default_return=None)
     async def _a_generate_reason(self, expected_output: str):
         if self.include_reason is False:
             return None
@@ -211,7 +211,7 @@ class ContextualRecallMetric(BaseMetric):
         score = justified_sentences / number_of_verdicts
         return 0 if self.strict_mode and score < self.threshold else score
     
-    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
+    @retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,), throw_exceptions=False, default_return=[])
     async def _a_generate_verdicts(
         self, expected_output: str, retrieval_context: List[str]
     ) -> List[ContextualRecallVerdict]:

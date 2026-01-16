@@ -83,7 +83,8 @@ def _extract_metrics_data(data):
                             # measure_data是数组，处理每个dataset的数据
                             for dataset_item in measure_data:
                                 dataset_name = dataset_item.get("dataset_name", "default")
-                                task_testcases_all[task_name][dataset_name] = []
+                                task_testcases_all[task_name].setdefault(
+                                    dataset_name, [])
                                 
                                 if isinstance(dataset_item, dict) and 'measure_result' in dataset_item:
                                     test_results = dataset_item.get('measure_result', '')
@@ -266,7 +267,7 @@ def create_metrics_summary(extracted_data: List[Dict[str, Any]], group_by_datase
             score_key = f'{metric_name}_score'
             success_key = f'{metric_name}_success'
             
-            scores = [case[score_key] for case in extracted_data if case.get(score_key) is not None]
+            scores = [case[score_key] for case in extracted_data if case.get(score_key) is not None and case[score_key] is not -1]
             successes = [case[success_key] for case in extracted_data if success_key in case]
             
             if scores:
@@ -299,7 +300,7 @@ def create_metrics_summary(extracted_data: List[Dict[str, Any]], group_by_datase
             score_key = f'{metric_name}_score'
             success_key = f'{metric_name}_success'
             
-            scores = [case[score_key] for case in extracted_data if case.get(score_key) is not None]
+            scores = [case[score_key] for case in extracted_data if case.get(score_key) is not None and case[score_key] is not -1]
             successes = [case[success_key] for case in extracted_data if success_key in case]
             
             if scores:
