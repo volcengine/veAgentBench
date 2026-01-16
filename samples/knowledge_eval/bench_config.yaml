@@ -1,0 +1,35 @@
+tasks:
+- name: knowledge_benmark
+  enable_cache: true
+  enable_score_cache: true
+  datasets:
+  - name: expertqa
+    description: knowledge_benmark测试数据集
+    property:
+      huggingface_repo: rungalileo/ragbench
+      type: huggingface                    # 测试集类型
+      config_name: expertqa      # subset名称
+      split: ["test"]    
+      columns_name:
+        input_column: "question"             # 输入列名
+        expected_column: "response"  
+  metrics:
+  - "ContextualPrecisionMetric"
+  - "ContextualRecallMetric"
+  - "PerformanceMetric"
+  - "TokensMetric"
+  judge_model:
+      model_name: ""
+      base_url: ""
+      api_key: ""
+      generation_kwargs:
+        max_tokens: 20480
+  agent:
+    type: LocalAdkAgent   
+    property:
+      agent_name: local_agent   
+      agent_dir_path: "agents/knowledge"   
+  max_concurrent: 100
+  measure_concurrent: 100
+  cache_dir: ./cache
+
